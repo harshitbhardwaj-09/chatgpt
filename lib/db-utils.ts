@@ -2,6 +2,14 @@ import connectDB from './mongodb'
 import User, { IUser } from '../models/User'
 import Conversation, { IConversation, MessageRole } from '../models/Conversation'
 
+// Type for partial conversation data (used in getUserConversations)
+export interface IConversationSummary {
+  _id: string
+  title: string
+  createdAt: Date
+  lastMessageAt: Date
+}
+
 /**
  * User operations
  */
@@ -77,12 +85,14 @@ export class ConversationService {
     return conversation
   }
 
-  static async getUserConversations(clerkUserId: string): Promise<IConversation[]> {
+  static async getUserConversations(clerkUserId: string): Promise<IConversationSummary[]> {
     await connectDB()
-    return Conversation.find({ clerkUserId })
+    const conversations = await Conversation.find({ clerkUserId })
       .sort({ lastMessageAt: -1 })
       .select('_id title createdAt lastMessageAt')
       .lean()
+    
+    return conversations as unknown as IConversationSummary[]
   }
 
   static async getConversationById(clerkUserId: string, conversationId: string): Promise<IConversation | null> {
@@ -143,9 +153,10 @@ export class ConversationService {
       throw new Error('Conversation not found')
     }
 
-    return conversation.messages.map(msg => ({
+        return conversation.messages.map((msg: any) => ({
       role: msg.role,
-      content: msg.content
+      content: msg.content,
+      createdAt: msg.createdAt
     }))
   }
 

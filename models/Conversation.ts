@@ -66,7 +66,7 @@ const ConversationSchema = new Schema<IConversation>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(doc: any, ret: any) {
       delete ret.__v
       return ret
     }
