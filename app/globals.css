@@ -3,6 +3,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Full screen layout */
+html, body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#__next,
+[data-nextjs-scroll-focus-boundary] {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Root container full screen */
+.full-screen-container {
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: hidden;
+}
+
 :root {
   /* Light theme colors matching ChatGPT's light mode */
   --background: oklch(1 0 0);
@@ -38,6 +63,21 @@
   --sidebar-accent-foreground: oklch(0.15 0 0);
   --sidebar-border: oklch(0.9 0 0);
   --sidebar-ring: oklch(0.4 0.15 142);
+
+  /* ChatGPT Token System - Light Mode */
+  --token-main-surface-primary: #ffffff;
+  --token-main-surface-secondary: #f9f9f9;
+  --token-sidebar-surface-primary: #f9f9f9;
+  --token-sidebar-surface-secondary: #ececec;
+  --token-text-primary: #0d0d0d;
+  --token-text-secondary: #676767;
+  --token-text-tertiary: #8e8e8e;
+  --token-border-light: #e5e5e5;
+  --token-border-medium: #d1d1d1;
+  --token-border-heavy: #b4b4b4;
+  --token-surface-primary: #ffffff;
+  --token-surface-secondary: #f4f4f4;
+  --token-bg-primary: #ffffff;
 }
 
 .dark {
@@ -74,6 +114,21 @@
   --sidebar-accent-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.25 0 0);
   --sidebar-ring: oklch(0.7 0.15 142);
+
+  /* ChatGPT Token System - Dark Mode */
+  --token-main-surface-primary: #212121;
+  --token-main-surface-secondary: #2f2f2f;
+  --token-sidebar-surface-primary: #171717;
+  --token-sidebar-surface-secondary: #2f2f2f;
+  --token-text-primary: #ececec;
+  --token-text-secondary: #c5c5c5;
+  --token-text-tertiary: #8e8e8e;
+  --token-border-light: #4d4d4d;
+  --token-border-medium: #676767;
+  --token-border-heavy: #8e8e8e;
+  --token-surface-primary: #2f2f2f;
+  --token-surface-secondary: #3f3f3f;
+  --token-bg-primary: #212121;
 }
 
 @theme inline {
@@ -124,4 +179,353 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ChatGPT Token Colors */
+:root {
+  /* Main surface colors */
+  --token-main-surface-primary: #ffffff;
+  --token-main-surface-secondary: #f7f7f8;
+  --token-main-surface-tertiary: #ececf1;
+  
+  /* Background colors */
+  --token-bg-primary: #ffffff;
+  --token-bg-secondary: #f7f7f8;
+  --token-bg-tertiary: #ececf1;
+  
+  /* Text colors */
+  --token-text-primary: #0d0d0d;
+  --token-text-secondary: #676767;
+  --token-text-tertiary: #8e8ea0;
+  
+  /* Border colors */
+  --token-border-light: #e5e5e5;
+  --token-border-medium: #d1d5db;
+  
+  /* Sidebar colors */
+  --token-sidebar-surface-primary: #f9f9f9;
+  --token-sidebar-surface-secondary: #ececf1;
+}
+
+.dark {
+  /* Main surface colors */
+  --token-main-surface-primary: #212121;
+  --token-main-surface-secondary: #2f2f2f;
+  --token-main-surface-tertiary: #424242;
+  
+  /* Background colors */
+  --token-bg-primary: #212121;
+  --token-bg-secondary: #2f2f2f;
+  --token-bg-tertiary: #424242;
+  
+  /* Text colors */
+  --token-text-primary: #ececec;
+  --token-text-secondary: #c5c5d2;
+  --token-text-tertiary: #8e8ea0;
+  
+  /* Border colors */
+  --token-border-light: #4d4d4f;
+  --token-border-medium: #565869;
+  
+  /* Sidebar colors */
+  --token-sidebar-surface-primary: #171717;
+  --token-sidebar-surface-secondary: #2f2f2f;
+}
+
+/* ChatGPT specific styles */
+.composer-btn {
+  @apply flex items-center justify-center h-8 w-8 rounded-lg transition-colors;
+  color: var(--token-text-secondary);
+}
+
+.composer-btn:hover {
+  background-color: var(--token-bg-secondary);
+}
+
+.composer-submit-btn {
+  @apply flex items-center justify-center rounded-full transition-all duration-200;
+}
+
+.composer-submit-button-color {
+  @apply bg-primary hover:bg-primary/90 text-primary-foreground disabled:bg-muted disabled:text-muted-foreground;
+}
+
+.__menu-item {
+  @apply flex items-center justify-center p-2 rounded-lg transition-colors duration-200;
+  color: var(--token-text-secondary);
+}
+
+.__menu-item:hover {
+  background-color: var(--token-bg-secondary);
+}
+
+.hoverable:hover {
+  background-color: var(--token-bg-secondary);
+}
+
+/* Grid area utilities for composer */
+.grid-area-leading {
+  grid-area: leading;
+}
+
+.grid-area-primary {
+  grid-area: primary;
+}
+
+.grid-area-trailing {
+  grid-area: trailing;
+}
+
+/* ChatGPT color utilities */
+.bg-token-main-surface-primary {
+  background-color: var(--token-main-surface-primary);
+}
+
+.bg-token-bg-primary {
+  background-color: var(--token-bg-primary);
+}
+
+.bg-token-bg-secondary {
+  background-color: var(--token-bg-secondary);
+}
+
+.bg-token-sidebar-surface-primary {
+  background-color: var(--token-sidebar-surface-primary);
+}
+
+.text-token-text-primary {
+  color: var(--token-text-primary);
+}
+
+.text-token-text-secondary {
+  color: var(--token-text-secondary);
+}
+
+.text-token-text-tertiary {
+  color: var(--token-text-tertiary);
+}
+
+.border-token-border-light {
+  border-color: var(--token-border-light);
+}
+
+/* Smooth transitions and animations */
+.transition-width {
+  transition: width 0.3s ease;
+}
+
+/* Custom scrollbar */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Icon sizes */
+.icon {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-lg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Spacing utilities for ChatGPT layout */
+.pb-25 {
+  padding-bottom: 6.25rem;
+}
+
+.z-21 {
+  z-index: 21;
+}
+
+/* Shadow utilities */
+.shadow-short {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dark .shadow-short {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ChatGPT Specific Styles */
+.hoverable {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.hoverable:hover {
+  background-color: var(--token-surface-secondary);
+}
+
+.__menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.__menu-item:hover {
+  background-color: var(--token-surface-secondary);
+}
+
+/* Draggable elements */
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.no-draggable {
+  -webkit-app-region: no-drag;
+}
+
+/* Button hover states */
+.btn {
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.btn:hover {
+  background-color: var(--token-surface-secondary);
+}
+
+/* Chat list item styling */
+.chat-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.chat-item:hover {
+  background-color: var(--token-surface-secondary);
+}
+
+.chat-item.active {
+  background-color: var(--token-sidebar-surface-secondary);
+}
+
+/* Composer styling */
+.composer-btn {
+  height: 2.5rem;
+  width: 2.5rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.composer-btn:hover {
+  background-color: var(--token-surface-secondary);
+}
+
+.composer-submit-btn {
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: 50%;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.composer-submit-button-color {
+  background-color: var(--token-text-primary);
+  color: var(--token-main-surface-primary);
+}
+
+.composer-submit-button-color:hover {
+  background-color: var(--token-text-secondary);
+}
+
+.composer-submit-button-color:disabled {
+  opacity: 0.4;
+  background-color: var(--token-border-light);
+}
+
+/* Gizmo avatar shadow */
+.gizmo-shadow-stroke {
+  box-shadow: 0 0 0 1px var(--token-border-light);
+}
+
+/* Markdown content styling */
+.markdown.prose {
+  color: var(--token-text-primary);
+  max-width: none;
+}
+
+.markdown.prose p {
+  margin-bottom: 1rem;
+  line-height: 1.625;
+}
+
+.markdown.prose p:last-child {
+  margin-bottom: 0;
+}
+
+/* Message action buttons */
+.message-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  color: var(--token-text-secondary);
+}
+
+.message-action-btn:hover {
+  background-color: var(--token-main-surface-secondary);
+}
+
+/* Grid area utilities for composer */
+.grid-area-leading {
+  grid-area: leading;
+}
+
+.grid-area-primary {
+  grid-area: primary;
+}
+
+.grid-area-trailing {
+  grid-area: trailing;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .md\\:px-15 {
+    padding-left: 3.75rem;
+    padding-right: 3.75rem;
+  }
+}
+
+/* Focus states */
+.focus-visible\\:outline-hidden:focus-visible {
+  outline: none;
 }

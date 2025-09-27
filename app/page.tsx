@@ -9,5 +9,9 @@ export default async function HomePage() {
     redirect("/sign-in")
   }
 
-  return <ChatInterface />
+  return (
+    <div className="full-screen-container">
+      <ChatInterface />
+    </div>
+  )
 }

@@ -35,6 +35,8 @@ import { Label } from "./ui/label"
 
 interface ChatSidebarProps {
   readonly onClose: () => void
+  readonly isCollapsed?: boolean
+  readonly onToggle?: () => void
 }
 
 interface RenameDialogState {
@@ -43,7 +45,7 @@ interface RenameDialogState {
   currentTitle: string
 }
 
-export function ChatSidebar({ onClose }: ChatSidebarProps) {
+export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSidebarProps) {
   const { chats, activeChat, createNewChat, deleteChat, renameChat, setActiveChat } = useChatStore()
   const { user } = useUser()
   const [renameDialog, setRenameDialog] = useState<RenameDialogState>({
