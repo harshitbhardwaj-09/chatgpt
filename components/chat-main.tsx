@@ -10,14 +10,37 @@ import { Send, Square } from "lucide-react"
 import { ChatMessage } from "./chat-message"
 
 export function ChatMain() {
-  const { activeChat, getCurrentChat, addMessageToChat, createNewChat, renameChat, generateChatTitle, setActiveChat } = useChatStore()
+  const { 
+    activeChat, 
+    getCurrentChat, 
+    addMessageToChat, 
+    createNewChat, 
+    renameChat, 
+    generateChatTitle, 
+    setActiveChat,
+    saveEditedMessage,
+    removeMessagesFromIndex,
+    streamingState,
+    startStreaming,
+    updateStreamingContent,
+    finishStreaming,
+    cancelStreaming,
+    loadConversationsFromDB,
+    windowState
+  } = useChatStore()
   const currentChat = getCurrentChat()
   
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [streamController, setStreamController] = useState<AbortController | null>(null)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // Load conversations from database on component mount
+  useEffect(() => {
+    loadConversationsFromDB()
+  }, [])
 
   // Auto-resize textarea
   const adjustTextareaHeight = () => {
@@ -47,6 +70,163 @@ export function ChatMain() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, isLoading])
+
+  // Stop streaming function
+  const stopStreaming = () => {
+    if (streamController) {
+      streamController.abort()
+      setStreamController(null)
+    }
+    cancelStreaming()
+    setIsLoading(false)
+  }
+
+  // Streaming helper function
+  const streamResponse = async (messages: any[], chatId: string, assistantMessageId: string, userMessage?: { content: string; role: string }) => {
+    const controller = new AbortController()
+    setStreamController(controller)
+    startStreaming(chatId, assistantMessageId)
+    
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          messages,
+          conversationId: chatId,
+          windowId: windowState.windowId,
+          userMessage: userMessage
+        }),
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`API Error (${response.status}): ${errorText}`)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('No response stream available')
+
+      const decoder = new TextDecoder()
+      let fullContent = ''
+      let lastUpdateTime = Date.now()
+
+      // Read the stream with timeout handling
+      while (true) {
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Stream timeout')), 30000) // 30s timeout
+        )
+        
+        const readPromise = reader.read()
+        
+        try {
+          const { done, value } = await Promise.race([readPromise, timeoutPromise]) as any
+          
+          if (done) break
+          
+          const chunk = decoder.decode(value, { stream: true })
+          fullContent += chunk
+          
+          // Throttle updates to avoid excessive re-renders (max every 50ms)
+          const now = Date.now()
+          if (now - lastUpdateTime > 50 || chunk.includes('\n')) {
+            updateStreamingContent(fullContent)
+            lastUpdateTime = now
+            
+            // Auto-scroll to bottom during streaming
+            setTimeout(scrollToBottom, 0)
+          }
+        } catch (timeoutError) {
+          console.warn('Stream timeout, finishing with current content')
+          break
+        }
+      }
+
+      // Final update with complete content
+      updateStreamingContent(fullContent)
+      finishStreaming()
+      
+      return fullContent.trim()
+    } catch (error) {
+      console.error('Streaming error:', error)
+      cancelStreaming()
+      setStreamController(null)
+      
+      // Handle aborted requests gracefully
+      if (error instanceof Error && error.name === 'AbortError') {
+        const currentContent = streamingState.streamingContent || ''
+        updateStreamingContent(currentContent + '\n\n[Response stopped by user]')
+        return currentContent
+      }
+      
+      // Update message with error content
+      const errorMessage = error instanceof Error 
+        ? `Sorry, there was an error: ${error.message}` 
+        : 'Sorry, there was an unexpected error processing your request.'
+      
+      updateStreamingContent(errorMessage)
+      
+      throw error
+    }
+  }
+
+  // Handle message editing with regeneration
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!activeChat || !currentChat) return
+
+    // Find the message index
+    const messageIndex = currentChat.messages.findIndex(msg => msg.id === messageId)
+    if (messageIndex === -1) return
+
+    // Save the edited message
+    saveEditedMessage(activeChat, messageId, newContent)
+
+    // Remove all messages after the edited one (for regeneration)
+    removeMessagesFromIndex(activeChat, messageIndex + 1)
+
+    // If this was a user message, regenerate the assistant response
+    const editedMessage = currentChat.messages[messageIndex]
+    if (editedMessage.role === 'user') {
+      // Get all messages up to and including the edited one
+      const updatedChat = getCurrentChat()
+      if (!updatedChat) return
+
+      const messagesToSend = updatedChat.messages.slice(0, messageIndex + 1).map(msg => ({
+        role: msg.role,
+        content: msg.id === messageId ? newContent : msg.content
+      }))
+
+      // Generate new response
+      setIsLoading(true)
+      try {
+        // Add placeholder assistant message for streaming
+        addMessageToChat(activeChat, {
+          content: "",
+          role: "assistant",
+        })
+
+        // Get the new assistant message ID
+        const updatedChatData = getCurrentChat()
+        if (!updatedChatData || updatedChatData.messages.length === 0) return
+        
+        const assistantMessage = updatedChatData.messages[updatedChatData.messages.length - 1]
+        
+        // Stream the response (no new user message for regeneration)
+        await streamResponse(messagesToSend, activeChat, assistantMessage.id)
+      } catch (error) {
+        console.error('Error regenerating response:', error)
+        addMessageToChat(activeChat, {
+          content: "Sorry, there was an error regenerating the response. Please try again.",
+          role: "assistant",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -80,54 +260,29 @@ export function ChatMain() {
     // Send message to API with streaming
     setIsLoading(true)
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...(currentChat?.messages || []), {
-            role: 'user',
-            content: userInput
-          }]
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
       // Add placeholder assistant message for streaming
       if (chatId) {
         addMessageToChat(chatId, {
           content: "",
           role: "assistant",
         })
-      }
 
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response body')
+        // Get the new assistant message ID
+        const updatedChatData = getCurrentChat()
+        if (updatedChatData && updatedChatData.messages.length > 0) {
+          const assistantMessage = updatedChatData.messages[updatedChatData.messages.length - 1]
+          
+          // Prepare messages for API
+          const messagesToSend = [...(currentChat?.messages || []), {
+            role: 'user' as const,
+            content: userInput
+          }]
 
-      let assistantMessage = ''
-      const decoder = new TextDecoder()
-
-      // Read the stream
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        
-        const chunk = decoder.decode(value, { stream: true })
-        assistantMessage += chunk
-      }
-
-      // Update the final assistant message
-      if (assistantMessage && chatId) {
-        const currentChatData = getCurrentChat()
-        if (currentChatData && currentChatData.messages.length > 0) {
-          const lastMessage = currentChatData.messages[currentChatData.messages.length - 1]
-          if (lastMessage.role === 'assistant') {
-            lastMessage.content = assistantMessage.trim()
-          }
+          // Stream the response
+          await streamResponse(messagesToSend, chatId, assistantMessage.id, {
+            content: userInput,
+            role: 'user'
+          })
         }
       }
     } catch (error) {
@@ -198,6 +353,8 @@ export function ChatMain() {
                                   role: message.role,
                                   timestamp: new Date(),
                                 }}
+                                onEdit={handleEditMessage}
+                                isLoading={isLoading && index === messages.length - 1}
                                 isStreaming={isLoading && index === messages.length - 1 && message.role === "assistant"}
                               />
                             </div>
@@ -288,12 +445,13 @@ export function ChatMain() {
                             </svg>
                           </Button>
                           
-                          {isLoading ? (
+                          {isLoading || streamingState.isStreaming ? (
                             <Button 
                               type="button" 
                               size="icon" 
-                              variant="ghost" 
-                              className="composer-submit-btn h-9 w-9"
+                              onClick={stopStreaming}
+                              className="composer-submit-btn h-9 w-9 bg-red-600 hover:bg-red-700 text-white"
+                              title="Stop generating"
                             >
                               <Square className="h-4 w-4" />
                             </Button>
@@ -303,6 +461,7 @@ export function ChatMain() {
                               size="icon" 
                               className="composer-submit-btn composer-submit-button-color h-9 w-9" 
                               disabled={!input?.trim()}
+                              title="Send message"
                             >
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" className="icon">
                                 <path d="M8.99992 16V6.41407L5.70696 9.70704C5.31643 10.0976 4.68342 10.0976 4.29289 9.70704C3.90237 9.31652 3.90237 8.6835 4.29289 8.29298L9.29289 3.29298L9.36907 3.22462C9.76184 2.90427 10.3408 2.92686 10.707 3.29298L15.707 8.29298L15.7753 8.36915C16.0957 8.76192 16.0731 9.34092 15.707 9.70704C15.3408 10.0732 14.7618 10.0958 14.3691 9.7754L14.2929 9.70704L10.9999 6.41407V16C10.9999 16.5523 10.5522 17 9.99992 17C9.44764 17 8.99992 16.5523 8.99992 16Z"/>

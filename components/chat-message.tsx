@@ -2,8 +2,10 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 import { Button } from "./ui/button"
-import { Copy, ThumbsUp, ThumbsDown } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Textarea } from "./ui/textarea"
+import { Copy, ThumbsUp, ThumbsDown, Edit2, Check, X } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { useChatStore } from "@/lib/chat-store"
 
 interface Message {
   id: string
@@ -16,11 +18,25 @@ interface ChatMessageProps {
   message: Message
   isLoading?: boolean
   isStreaming?: boolean
+  onEdit?: (messageId: string, newContent: string) => void
 }
 
-export function ChatMessage({ message, isLoading = false, isStreaming = false }: ChatMessageProps) {
+export function ChatMessage({ message, isLoading = false, isStreaming = false, onEdit }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [displayedContent, setDisplayedContent] = useState("")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  const { 
+    editState, 
+    streamingState,
+    startEditingMessage, 
+    updateEditedContent, 
+    cancelEditing 
+  } = useChatStore()
+
+  const isEditing = editState.isEditing && editState.messageId === message.id
+  const isUser = message.role === "user"
+  const isCurrentlyStreaming = streamingState.isStreaming && streamingState.streamingMessageId === message.id
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(message.content)
@@ -28,9 +44,55 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false }:
     setTimeout(() => setCopied(false), 2000)
   }
 
-  // Typing animation effect for streaming messages
+  const handleEditStart = () => {
+    startEditingMessage(message.id, message.content)
+  }
+
+  const handleEditCancel = () => {
+    cancelEditing()
+  }
+
+  const handleEditSave = () => {
+    if (onEdit && editState.editedContent.trim()) {
+      onEdit(message.id, editState.editedContent.trim())
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleEditCancel()
+    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleEditSave()
+    }
+  }
+
+  // Auto-resize textarea and focus when editing starts
   useEffect(() => {
-    if (isStreaming && message.content) {
+    if (isEditing && textareaRef.current) {
+      const textarea = textareaRef.current
+      textarea.focus()
+      // Auto-resize
+      textarea.style.height = 'auto'
+      textarea.style.height = textarea.scrollHeight + 'px'
+    }
+  }, [isEditing])
+
+  // Auto-resize textarea on content change
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    updateEditedContent(e.target.value)
+    // Auto-resize
+    e.target.style.height = 'auto'
+    e.target.style.height = e.target.scrollHeight + 'px'
+  }
+
+  // Real-time content update for streaming messages
+  useEffect(() => {
+    if (isCurrentlyStreaming) {
+      // For streaming messages, show content immediately as it comes in
+      setDisplayedContent(message.content)
+    } else if (isStreaming && message.content) {
+      // For non-real-time streaming (fallback), use typing animation
       let currentIndex = 0
       const interval = setInterval(() => {
         if (currentIndex <= message.content.length) {
@@ -39,15 +101,13 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false }:
         } else {
           clearInterval(interval)
         }
-      }, 20) // Adjust speed here (lower = faster)
+      }, 15) // Slightly faster for better UX
       
       return () => clearInterval(interval)
     } else {
       setDisplayedContent(message.content)
     }
-  }, [message.content, isStreaming])
-
-  const isUser = message.role === "user"
+  }, [message.content, isStreaming, isCurrentlyStreaming])
 
   return (
     <div className={`group/turn-messages flex w-full min-w-0 flex-col`}>
@@ -95,27 +155,73 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false }:
                                   {/* Message text */}
                                   <div className="flex w-full flex-col gap-1 empty:hidden first:pt-[3px]">
                                     <div className="markdown prose w-full break-words dark:prose-invert light" dir="auto">
-                                      {isLoading ? (
-                                        <div className="flex items-center gap-1">
+                                      {isEditing ? (
+                                        <div className="w-full animate-in fade-in-0 duration-200">
+                                          <Textarea
+                                            ref={textareaRef}
+                                            value={editState.editedContent}
+                                            onChange={handleContentChange}
+                                            onKeyDown={handleKeyDown}
+                                            className="w-full min-h-[60px] resize-none border-2 border-blue-500 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-all duration-200"
+                                            style={{ 
+                                              color: 'var(--token-text-primary)',
+                                              backgroundColor: 'var(--token-bg-primary)'
+                                            }}
+                                            placeholder="Edit your message..."
+                                          />
+                                          <div className="flex gap-2 mt-2 animate-in slide-in-from-top-2 duration-200">
+                                            <Button
+                                              size="sm"
+                                              onClick={handleEditSave}
+                                              disabled={!editState.editedContent.trim()}
+                                              className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200 disabled:opacity-50"
+                                            >
+                                              <Check className="w-3 h-3 mr-1" />
+                                              Save
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={handleEditCancel}
+                                              className="h-7 px-3 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            >
+                                              <X className="w-3 h-3 mr-1" />
+                                              Cancel
+                                            </Button>
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1 animate-in fade-in-0 duration-300 delay-100">
+                                            Press <kbd className="px-1 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 rounded">Ctrl+Enter</kbd> to save, <kbd className="px-1 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 rounded">Escape</kbd> to cancel
+                                          </div>
+                                        </div>
+                                      ) : isLoading && !displayedContent ? (
+                                        <div className="flex items-center gap-1 py-2">
                                           <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
                                           <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
                                           <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                                         </div>
                                       ) : (
-                                        <p style={{color: 'var(--token-text-primary)'}}>
-                                          {displayedContent}
-                                          {isStreaming && displayedContent.length < message.content.length && (
-                                            <span className="animate-pulse">|</span>
+                                        <div className="relative">
+                                          <p style={{color: 'var(--token-text-primary)'}}>
+                                            {displayedContent}
+                                            {(isCurrentlyStreaming || (isStreaming && displayedContent.length < message.content.length)) && (
+                                              <span className="inline-block w-0.5 h-5 bg-current animate-pulse ml-0.5 align-middle">|</span>
+                                            )}
+                                          </p>
+                                          {isCurrentlyStreaming && (
+                                            <div className="absolute -bottom-1 left-0 text-xs text-gray-400 animate-pulse">
+                                              AI is typing...
+                                            </div>
                                           )}
-                                        </p>
+                                        </div>
                                       )}
                                     </div>
                                   </div>
 
                                   {/* Message actions */}
-                                  {!isUser && !isLoading && message.content && (
+                                  {!isLoading && message.content && !isEditing && !isCurrentlyStreaming && (
                                     <div className="mt-1 flex justify-start gap-3 empty:hidden">
                                       <div className="text-gray-400 flex self-end lg:self-center justify-center mt-0 gap-1 lg:gap-2 lg:absolute lg:top-0 lg:translate-x-full lg:right-0 lg:mt-0 lg:pl-2 visible">
+                                        {/* Copy button for all messages */}
                                         <Button
                                           variant="ghost"
                                           size="icon"
@@ -127,26 +233,46 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false }:
                                             <path d="M11.986 3H12.5c.276 0 .5-.224.5-.5s-.224-.5-.5-.5h-1c0-.552-.448-1-1-1H4.5c-.552 0-1 .448-1 1v8c0 .552.448 1 1 1H6v1.5c0 .276.224.5.5.5s.5-.224.5-.5V12h4.5c.552 0 1-.448 1-1V4c0-.552-.448-1-1-1zM5.5 10V3H10v7H5.5zm5.5-6v6H7V4h4z"/>
                                           </svg>
                                         </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="flex h-7 w-7 items-center justify-center rounded-full text-token-text-secondary transition hover:bg-token-main-surface-secondary"
-                                          aria-label="Good response"
-                                        >
-                                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="icon-sm">
-                                            <path d="M11.3 1.046A1 1 0 0 1 12.85 1.95l-.85-.904zm1.55.904-2.41 11.996-8.45-4.63a1 1 0 0 1 .894-1.788L10.25 10.75l2.6-9.8z"/>
-                                          </svg>
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="flex h-7 w-7 items-center justify-center rounded-full text-token-text-secondary transition hover:bg-token-main-surface-secondary"
-                                          aria-label="Bad response"
-                                        >
-                                          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="icon-sm">
-                                            <path d="M11.3 14.954A1 1 0 0 0 12.85 14.05l-.85.904zm1.55-.904-2.41-11.996L2 6.684a1 1 0 0 0 .894 1.788L10.25 5.25l2.6 9.8z"/>
-                                          </svg>
-                                        </Button>
+                                        
+                                        {/* Edit button for user messages */}
+                                        {isUser && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="flex h-7 w-7 items-center justify-center rounded-full text-token-text-secondary transition-all duration-200 hover:bg-token-main-surface-secondary hover:text-blue-600 opacity-70 hover:opacity-100"
+                                            onClick={handleEditStart}
+                                            aria-label="Edit message"
+                                          >
+                                            <Edit2 className="w-4 h-4" />
+                                          </Button>
+                                        )}
+                                        
+                                        {/* Assistant message actions */}
+                                        {!isUser && (
+                                          <>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="flex h-7 w-7 items-center justify-center rounded-full text-token-text-secondary transition hover:bg-token-main-surface-secondary"
+                                              aria-label="Good response"
+                                            >
+                                              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="icon-sm">
+                                                <path d="M11.3 1.046A1 1 0 0 1 12.85 1.95l-.85-.904zm1.55.904-2.41 11.996-8.45-4.63a1 1 0 0 1 .894-1.788L10.25 10.75l2.6-9.8z"/>
+                                              </svg>
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="flex h-7 w-7 items-center justify-center rounded-full text-token-text-secondary transition hover:bg-token-main-surface-secondary"
+                                              aria-label="Bad response"
+                                            >
+                                              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="icon-sm">
+                                                <path d="M11.3 14.954A1 1 0 0 0 12.85 14.05l-.85.904zm1.55-.904-2.41-11.996L2 6.684a1 1 0 0 0 .894 1.788L10.25 5.25l2.6 9.8z"/>
+                                              </svg>
+                                            </Button>
+                                          </>
+                                        )}
+                                        
                                         {copied && (
                                           <span className="text-xs text-token-text-secondary ml-2">Copied!</span>
                                         )}

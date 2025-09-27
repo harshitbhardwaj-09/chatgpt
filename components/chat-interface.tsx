@@ -1,13 +1,55 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 import { ChatGPTSidebar } from "./chatgpt-sidebar"
 import { ChatMain } from "./chat-main"
 import { Button } from "./ui/button"
 import { Menu, Share, MoreHorizontal } from "lucide-react"
+import { useChatStore } from "@/lib/chat-store"
 
 export function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const { user, isLoaded } = useUser()
+  const router = useRouter()
+  const { initializeWindow, loadConversationsFromDB } = useChatStore()
+
+  // Authentication guard and initialization
+  useEffect(() => {
+    if (isLoaded && !user) {
+      // Redirect to sign-in if not authenticated
+      router.push('/sign-in')
+      return
+    }
+
+    if (isLoaded && user) {
+      // Initialize window state for this session
+      initializeWindow()
+      
+      // Load user's conversations from database
+      loadConversationsFromDB().catch(error => {
+        console.error('Failed to load conversations:', error)
+      })
+    }
+  }, [isLoaded, user, router, initializeWindow, loadConversationsFromDB])
+
+  // Show loading state while authentication is being checked
+  if (!isLoaded) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center" style={{backgroundColor: 'var(--token-main-surface-primary)'}}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
+          <p style={{color: 'var(--token-text-primary)'}}>Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect if not authenticated (shouldn't reach here due to middleware, but safety check)
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="relative flex h-screen w-screen flex-row" style={{backgroundColor: 'var(--token-main-surface-primary)'}}>

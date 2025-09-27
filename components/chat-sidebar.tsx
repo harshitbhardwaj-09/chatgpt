@@ -200,7 +200,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleRenameChat(chat.id, chat.title)
+                        handleRenameChat(chat.id, chat.title || 'Untitled Chat')
                       }}
                     >
                       <Edit3 className="h-4 w-4 mr-2" />

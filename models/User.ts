@@ -1,58 +1,55 @@
-import { Schema, model, models, Document } from 'mongoose'
+import mongoose, { Document, Schema } from 'mongoose';
 
-export interface IUser extends Document {
-  clerkId: string
-  email: string
-  firstName?: string
-  lastName?: string
-  username?: string
-  avatar?: string
-  createdAt: Date
-  updatedAt: Date
+interface IUser extends Document {
+  clerkId: string;          // Clerk user ID for authentication mapping
+  email: string;            // Primary identifier from Clerk
+  name?: string;            // Optional display name from Clerk
+  avatar?: string;          // Optional avatar URL from Clerk
+  isActive: boolean;        // Account status
+  lastActiveAt: Date;       // Last activity timestamp
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>({
-  clerkId: { 
-    type: String, 
-    required: true, 
+  clerkId: {
+    type: String,
+    required: true,
     unique: true,
-    index: true 
+    index: true
   },
-  email: { 
-    type: String, 
-    required: true, 
+  email: {
+    type: String,
+    required: true,
     unique: true,
     lowercase: true,
-    trim: true 
+    trim: true,
+    index: true
   },
-  firstName: { 
-    type: String, 
-    trim: true 
+  name: {
+    type: String,
+    trim: true
   },
-  lastName: { 
-    type: String, 
-    trim: true 
+  avatar: {
+    type: String,
+    trim: true
   },
-  username: { 
-    type: String, 
-    trim: true 
+  isActive: {
+    type: Boolean,
+    default: true
   },
-  avatar: { 
-    type: String 
+  lastActiveAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
-  timestamps: true,
-  toJSON: {
-    transform: function(doc: any, ret: any) {
-      delete ret.__v
-      return ret
-    }
-  }
-})
+  timestamps: true
+});
 
-// Indexes for better performance
-UserSchema.index({ clerkId: 1 })
-UserSchema.index({ email: 1 })
+// Compound index for efficient queries
+UserSchema.index({ clerkId: 1, email: 1 });
+UserSchema.index({ isActive: 1, lastActiveAt: -1 });
 
-export default models.User || model<IUser>('User', UserSchema)
+export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+export type { IUser };
 

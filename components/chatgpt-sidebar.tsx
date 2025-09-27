@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { useChatStore } from "../lib/chat-store"
 import { useUser } from "@clerk/nextjs"
+import { UserProfileDropdown } from "./user-profile-dropdown"
 
 interface ChatGPTSidebarProps {
   isCollapsed: boolean
@@ -336,20 +337,8 @@ export function ChatGPTSidebar({ isCollapsed, onToggle }: ChatGPTSidebarProps) {
             </span>
           </Button>
 
-          {/* User profile */}
-          <Button
-            variant="ghost"
-            className="w-full h-10 justify-start gap-3 rounded-lg px-3 hoverable"
-          >
-            <div className="flex h-6 w-6 items-center justify-center rounded-full" style={{backgroundColor: 'var(--token-surface-primary)'}}>
-              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-white">
-                <span className="text-xs font-medium">{user?.firstName?.charAt(0) || 'H'}</span>
-              </div>
-            </div>
-            <span className="truncate text-sm font-medium" style={{color: 'var(--token-text-primary)'}}>
-              {user?.firstName || 'harshit'}
-            </span>
-          </Button>
+          {/* User profile dropdown */}
+          <UserProfileDropdown />
         </div>
       </div>
     </div>
