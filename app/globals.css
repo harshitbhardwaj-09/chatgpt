@@ -3,6 +3,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Custom animations for chat interface */
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
 /* Full screen layout */
 html, body {
   height: 100vh;
@@ -69,6 +79,7 @@ html, body {
   --token-main-surface-secondary: #f9f9f9;
   --token-sidebar-surface-primary: #f9f9f9;
   --token-sidebar-surface-secondary: #ececec;
+  --token-sidebar-surface-tertiary: #e0e0e0;
   --token-text-primary: #0d0d0d;
   --token-text-secondary: #676767;
   --token-text-tertiary: #8e8e8e;
@@ -120,6 +131,7 @@ html, body {
   --token-main-surface-secondary: #2f2f2f;
   --token-sidebar-surface-primary: #171717;
   --token-sidebar-surface-secondary: #2f2f2f;
+  --token-sidebar-surface-tertiary: #404040;
   --token-text-primary: #ececec;
   --token-text-secondary: #c5c5c5;
   --token-text-tertiary: #8e8e8e;

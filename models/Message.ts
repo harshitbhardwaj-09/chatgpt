@@ -1,16 +1,30 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+interface IFileAttachment {
+  id: string;                               // Cloudinary public_id
+  originalName: string;                     // Original file name
+  cloudinaryUrl: string;                    // Cloudinary secure URL
+  mimeType: string;                         // File MIME type
+  size: number;                             // File size in bytes
+  extractedText: string;                    // Text extracted from file
+  metadata?: any;                           // Additional file metadata
+  uploadedAt: Date;                         // When file was uploaded
+}
+
 interface IMessage extends Document {
   conversationId: mongoose.Types.ObjectId;  // Reference to Conversation document
   userId: mongoose.Types.ObjectId;          // Reference to User document
   clerkUserId: string;                      // Clerk user ID for quick lookups
-  role: 'user' | 'assistant' | 'system';   // Message role
+  role: 'user' | 'assistant' | 'system' | 'tool'; // Message role (added 'tool')
   content: string;                          // Message content
+  contentType: string;                      // Content type (text, markdown, json, etc.)
   tokenCount: number;                       // Tokens used by this message
   status: 'pending' | 'done' | 'error' | 'streaming'; // Message status
   parentMessageId?: mongoose.Types.ObjectId; // For message editing/branching
+  referencedMessageIds?: mongoose.Types.ObjectId[]; // Messages this message references
   isEdited: boolean;                        // Whether message was edited
   editedAt?: Date;                          // When message was last edited
+  attachments?: IFileAttachment[];          // File attachments
   metadata: {
     model?: string;                         // AI model used for this specific message
     temperature?: number;                   // Generation temperature
@@ -23,6 +37,7 @@ interface IMessage extends Document {
     };
     streamingDuration?: number;             // Time taken to stream (ms)
     error?: string;                         // Error message if status is 'error'
+    hasAttachments?: boolean;               // Quick flag for attachment presence
   };
   reactions?: {                             // User reactions to message
     thumbsUp: boolean;
@@ -53,7 +68,7 @@ const MessageSchema = new Schema<IMessage>({
   },
   role: {
     type: String,
-    enum: ['user', 'assistant', 'system'],
+    enum: ['user', 'assistant', 'system', 'tool'],
     required: true,
     index: true
   },
@@ -62,6 +77,12 @@ const MessageSchema = new Schema<IMessage>({
     required: true,
     trim: true,
     maxlength: 32000  // Maximum content length
+  },
+  contentType: {
+    type: String,
+    enum: ['text', 'markdown', 'json', 'html', 'code'],
+    default: 'text',
+    index: true
   },
   tokenCount: {
     type: Number,
@@ -76,8 +97,14 @@ const MessageSchema = new Schema<IMessage>({
   },
   parentMessageId: {
     type: Schema.Types.ObjectId,
-    ref: 'Message'
+    ref: 'Message',
+    index: true,
+    sparse: true
   },
+  referencedMessageIds: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Message'
+  }],
   isEdited: {
     type: Boolean,
     default: false,
@@ -89,7 +116,7 @@ const MessageSchema = new Schema<IMessage>({
   metadata: {
     model: {
       type: String,
-      enum: ['gemini-2.5-flash', 'gemini-pro', 'gpt-4', 'gpt-3.5-turbo']
+      enum: ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro', 'gpt-4', 'gpt-3.5-turbo']
     },
     temperature: {
       type: Number,
@@ -117,8 +144,49 @@ const MessageSchema = new Schema<IMessage>({
     error: {
       type: String,
       maxlength: 1000
+    },
+    hasAttachments: {
+      type: Boolean,
+      default: false,
+      index: true
     }
   },
+  attachments: [{
+    id: {
+      type: String,
+      required: true
+    },
+    originalName: {
+      type: String,
+      required: true,
+      maxlength: 255
+    },
+    cloudinaryUrl: {
+      type: String,
+      required: true
+    },
+    mimeType: {
+      type: String,
+      required: true
+    },
+    size: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    extractedText: {
+      type: String,
+      default: ''
+    },
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {}
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   reactions: {
     thumbsUp: { type: Boolean, default: false },
     thumbsDown: { type: Boolean, default: false },
@@ -132,7 +200,7 @@ const MessageSchema = new Schema<IMessage>({
 MessageSchema.index({ conversationId: 1, createdAt: 1 }); // Messages in conversation chronologically
 MessageSchema.index({ clerkUserId: 1, role: 1 }); // User's messages by role
 MessageSchema.index({ status: 1, createdAt: -1 }); // Pending/error messages
-MessageSchema.index({ parentMessageId: 1 }); // Message editing chains
+// MessageSchema.index({ parentMessageId: 1 }); // Already indexed in schema definition
 MessageSchema.index({ 'metadata.usage.totalTokens': -1 }); // High token usage messages
 
 // Pre-save middleware for edit tracking

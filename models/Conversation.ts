@@ -3,6 +3,8 @@ import mongoose, { Document, Schema } from 'mongoose';
 interface IConversation extends Document {
   userId: mongoose.Types.ObjectId;    // Reference to User document
   clerkUserId: string;                // Clerk user ID for quick lookups
+  sessionId?: mongoose.Types.ObjectId; // Reference to Session document
+  windowId?: string;                  // Browser window/tab identifier
   title?: string;                     // Auto-generated from first message or user-provided
   messageCount: number;               // Total messages in conversation
   tokenCount: number;                 // Sum of tokens for context window management
@@ -16,6 +18,11 @@ interface IConversation extends Document {
     source?: string;                  // How conversation was created (web, mobile, api)
     tags?: string[];                  // User-defined tags
     summary?: string;                 // AI-generated summary for long conversations
+    windowInfo?: {                    // Window-specific metadata
+      userAgent?: string;
+      screenResolution?: string;
+      timezone?: string;
+    };
   };
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +39,17 @@ const ConversationSchema = new Schema<IConversation>({
     type: String,
     required: true,
     index: true
+  },
+  sessionId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Session',
+    index: true,
+    sparse: true
+  },
+  windowId: {
+    type: String,
+    index: true,
+    sparse: true
   },
   title: {
     type: String,
@@ -72,7 +90,7 @@ const ConversationSchema = new Schema<IConversation>({
   aiModel: {
     type: String,
     default: 'gemini-2.5-flash',
-    enum: ['gemini-2.5-flash', 'gemini-pro', 'gpt-4', 'gpt-3.5-turbo']
+    enum: ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro', 'gpt-4', 'gpt-3.5-turbo']
   },
   systemPrompt: {
     type: String,
@@ -91,6 +109,11 @@ const ConversationSchema = new Schema<IConversation>({
     summary: {
       type: String,
       maxlength: 500
+    },
+    windowInfo: {
+      userAgent: String,
+      screenResolution: String,
+      timezone: String
     }
   }
 }, {

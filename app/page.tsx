@@ -10,23 +10,21 @@ export default async function HomePage() {
     redirect("/sign-in")
   }
 
-  // Get the full user data from Clerk
+  // Get the full user data from Clerk and store in background
   const clerkUser = await currentUser()
   
+  // Store user in database (non-blocking)
   if (clerkUser) {
-    // Automatically store/update user in our database
     try {
-      await UserService.findOrCreateUser({
-        id: clerkUser.id,
-        emailAddresses: clerkUser.emailAddresses,
-        firstName: clerkUser.firstName,
-        lastName: clerkUser.lastName,
-        username: clerkUser.username,
-        imageUrl: clerkUser.imageUrl
-      })
+      await UserService.findOrCreateUser(
+        clerkUser.id,
+        clerkUser.emailAddresses[0]?.emailAddress || '',
+        `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() || 'User',
+        clerkUser.imageUrl
+      )
     } catch (error) {
       console.error('Failed to store user in database:', error)
-      // Continue to chat interface even if DB storage fails
+      // This is non-critical for the app functionality
     }
   }
 

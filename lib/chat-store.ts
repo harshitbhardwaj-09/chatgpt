@@ -1,6 +1,19 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
+export interface FileAttachment {
+  id: string
+  type: 'document' | 'image'
+  fileName: string
+  fileType: string
+  content?: string
+  mimeType?: string
+  size: number
+  wordCount?: number
+  cloudinaryUrl?: string
+  publicId?: string
+}
+
 export interface ChatMessage {
   id: string
   content: string
@@ -11,6 +24,7 @@ export interface ChatMessage {
   isEdited?: boolean
   editedAt?: Date
   parentMessageId?: string
+  attachments?: FileAttachment[]
 }
 
 export interface Chat {
@@ -26,6 +40,8 @@ export interface Chat {
   aiModel: string
   systemPrompt?: string
   windowId?: string  // Track which window/session created this chat
+  isTemporary?: boolean  // True until first LLM response
+  permanentId?: string   // MongoDB ObjectId assigned after first response
   metadata?: {
     source: 'web' | 'mobile' | 'api'
     sessionId?: string
@@ -60,6 +76,21 @@ interface WindowState {
   isActiveWindow: boolean
 }
 
+interface SearchState {
+  query: string
+  isSearching: boolean
+  searchResults: Chat[]
+  recentSearches: string[]
+}
+
+interface WindowConversationState {
+  [windowId: string]: {
+    lastConversations: string[] // Array of conversation IDs
+    maxConversations: number
+    lastAccessed: Date
+  }
+}
+
 interface ChatStore {
   chats: Chat[]
   activeChat: string | null
@@ -67,6 +98,8 @@ interface ChatStore {
   streamingState: StreamingState
   syncState: SyncState
   windowState: WindowState
+  searchState: SearchState
+  windowConversations: WindowConversationState
   // Window management
   initializeWindow: () => void
   setActiveWindow: (isActive: boolean) => void
@@ -74,7 +107,8 @@ interface ChatStore {
   deleteChat: (chatId: string) => void
   renameChat: (chatId: string, newTitle: string) => void
   setActiveChat: (chatId: string) => void
-  addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant" }) => void
+  addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }) => void
+  makeChatPermanent: (tempChatId: string, permanentId: string, generatedTitle?: string) => void
   getCurrentChat: () => Chat | null
   generateChatTitle: (firstMessage: string) => string
   // Edit functionality
@@ -99,6 +133,16 @@ interface ChatStore {
   setSyncError: (error: string | null) => void
   setOnlineStatus: (isOnline: boolean) => void
   retrySyncOperations: () => Promise<void>
+  // Search functionality
+  searchChats: (query: string) => void
+  clearSearch: () => void
+  addRecentSearch: (query: string) => void
+  getFilteredChats: () => Chat[]
+  // Window conversation management
+  addConversationToWindow: (windowId: string, conversationId: string) => void
+  getWindowConversations: (windowId: string) => string[]
+  removeConversationFromWindow: (windowId: string, conversationId: string) => void
+  cleanupOldWindowData: () => void
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -129,6 +173,13 @@ export const useChatStore = create<ChatStore>()(
         sessionStartTime: new Date(),
         isActiveWindow: typeof document !== 'undefined' ? !document.hidden : true,
       },
+      searchState: {
+        query: '',
+        isSearching: false,
+        searchResults: [],
+        recentSearches: []
+      },
+      windowConversations: {},
 
       // Window management methods
       initializeWindow: () => {
@@ -170,8 +221,9 @@ export const useChatStore = create<ChatStore>()(
       createNewChat: () => {
         const now = new Date()
         const state = get()
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         const newChat: Chat = {
-          id: Date.now().toString(),
+          id: tempId,
           title: "New Conversation",
           timestamp: now,
           lastMessageAt: now,
@@ -180,7 +232,8 @@ export const useChatStore = create<ChatStore>()(
           tokenCount: 0,
           isArchived: false,
           isPinned: false,
-          aiModel: "gemini-2.5-flash",
+          aiModel: "gemini-1.5-flash",
+          isTemporary: true,  // Mark as temporary
           windowId: state.windowState.windowId,
           metadata: {
             source: 'web',
@@ -193,8 +246,7 @@ export const useChatStore = create<ChatStore>()(
           activeChat: newChat.id,
         }))
         
-        // Sync to database
-        get().syncChatToDB(newChat.id)
+        // Don't sync temporary chats to database yet
         return newChat.id
       },
 
@@ -228,9 +280,32 @@ export const useChatStore = create<ChatStore>()(
 
       setActiveChat: (chatId: string) => {
         set({ activeChat: chatId })
+        
+        // Add conversation to current window
+        const { windowState } = get()
+        if (windowState.windowId && chatId) {
+          get().addConversationToWindow(windowState.windowId, chatId)
+        }
       },
 
-      addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant" }) => {
+      makeChatPermanent: (tempChatId: string, permanentId: string, generatedTitle?: string) => {
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === tempChatId
+              ? {
+                  ...chat,
+                  id: permanentId,
+                  permanentId,
+                  isTemporary: false,
+                  title: generatedTitle || chat.title,
+                }
+              : chat
+          ),
+          activeChat: state.activeChat === tempChatId ? permanentId : state.activeChat,
+        }))
+      },
+
+      addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }) => {
         const state = get()
         const chat = state.chats.find(c => c.id === chatId)
         
@@ -261,6 +336,7 @@ export const useChatStore = create<ChatStore>()(
                       content: message.content,
                       role: message.role,
                       timestamp: new Date(),
+                      attachments: message.attachments,
                     },
                   ],
                 }
@@ -619,6 +695,183 @@ export const useChatStore = create<ChatStore>()(
         } catch (error) {
           get().setSyncError('Failed to sync with database')
         }
+      },
+
+      // Search functionality
+      searchChats: (query: string) => {
+        set((state) => {
+          const trimmedQuery = query.trim().toLowerCase()
+          
+          if (!trimmedQuery) {
+            return {
+              searchState: {
+                ...state.searchState,
+                query: '',
+                isSearching: false,
+                searchResults: []
+              }
+            }
+          }
+
+          // Search in chat titles and message content
+          const searchResults = state.chats.filter(chat => {
+            // Search in title
+            if (chat.title?.toLowerCase().includes(trimmedQuery)) {
+              return true
+            }
+            
+            // Search in message content
+            return chat.messages.some(message => 
+              message.content.toLowerCase().includes(trimmedQuery)
+            )
+          }).sort((a, b) => {
+            // Prioritize title matches
+            const aTitleMatch = a.title?.toLowerCase().includes(trimmedQuery) ?? false
+            const bTitleMatch = b.title?.toLowerCase().includes(trimmedQuery) ?? false
+            
+            if (aTitleMatch && !bTitleMatch) return -1
+            if (!aTitleMatch && bTitleMatch) return 1
+            
+            // Then sort by recency
+            return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()
+          })
+
+          return {
+            searchState: {
+              ...state.searchState,
+              query,
+              isSearching: true,
+              searchResults
+            }
+          }
+        })
+      },
+
+      clearSearch: () => {
+        set((state) => ({
+          searchState: {
+            ...state.searchState,
+            query: '',
+            isSearching: false,
+            searchResults: []
+          }
+        }))
+      },
+
+      addRecentSearch: (query: string) => {
+        const trimmedQuery = query.trim()
+        if (!trimmedQuery) return
+
+        set((state) => {
+          const recentSearches = [
+            trimmedQuery,
+            ...state.searchState.recentSearches.filter(s => s !== trimmedQuery)
+          ].slice(0, 10) // Keep only last 10 searches
+
+          return {
+            searchState: {
+              ...state.searchState,
+              recentSearches
+            }
+          }
+        })
+      },
+
+      getFilteredChats: () => {
+        const state = get()
+        const { searchState, windowState } = state
+        
+        if (searchState.isSearching && searchState.query) {
+          return searchState.searchResults
+        }
+        
+        // If not searching, return window-specific conversations first, then all chats
+        const windowConversations = state.windowConversations[windowState.windowId]
+        if (windowConversations && windowConversations.lastConversations.length > 0) {
+          const windowChats = windowConversations.lastConversations
+            .map(id => state.chats.find(chat => chat.id === id || chat.permanentId === id))
+            .filter(Boolean) as Chat[]
+          
+          const otherChats = state.chats.filter(chat => 
+            !windowConversations.lastConversations.includes(chat.id) &&
+            !windowConversations.lastConversations.includes(chat.permanentId || '')
+          )
+          
+          return [
+            ...windowChats.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
+            ...otherChats.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+          ]
+        }
+        
+        return state.chats.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime())
+      },
+
+      // Window conversation management
+      addConversationToWindow: (windowId: string, conversationId: string) => {
+        set((state) => {
+          const maxConversations = 10 // Keep last 10 conversations per window
+          const windowData = state.windowConversations[windowId] || {
+            lastConversations: [],
+            maxConversations,
+            lastAccessed: new Date()
+          }
+
+          const updatedConversations = [
+            conversationId,
+            ...windowData.lastConversations.filter(id => id !== conversationId)
+          ].slice(0, maxConversations)
+
+          return {
+            windowConversations: {
+              ...state.windowConversations,
+              [windowId]: {
+                ...windowData,
+                lastConversations: updatedConversations,
+                lastAccessed: new Date()
+              }
+            }
+          }
+        })
+      },
+
+      getWindowConversations: (windowId: string) => {
+        const state = get()
+        return state.windowConversations[windowId]?.lastConversations || []
+      },
+
+      removeConversationFromWindow: (windowId: string, conversationId: string) => {
+        set((state) => {
+          const windowData = state.windowConversations[windowId]
+          if (!windowData) return state
+
+          return {
+            windowConversations: {
+              ...state.windowConversations,
+              [windowId]: {
+                ...windowData,
+                lastConversations: windowData.lastConversations.filter(id => id !== conversationId),
+                lastAccessed: new Date()
+              }
+            }
+          }
+        })
+      },
+
+      cleanupOldWindowData: () => {
+        set((state) => {
+          const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+          const cleanedWindowConversations: WindowConversationState = {}
+
+          Object.entries(state.windowConversations).forEach(([windowId, data]) => {
+            if (new Date(data.lastAccessed) > oneWeekAgo) {
+              cleanedWindowConversations[windowId] = data
+            }
+          })
+
+          return {
+            windowConversations: cleanedWindowConversations
+          }
+        })
       },
     }),
     {

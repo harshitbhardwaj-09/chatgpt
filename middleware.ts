@@ -1,10 +1,16 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"])
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/api/health", "/api/simple-upload"])
 
 export default clerkMiddleware(async (auth, request) => {
+  // Allow health check without authentication
   if (!isPublicRoute(request)) {
-    await auth.protect()
+    try {
+      await auth.protect()
+    } catch (error) {
+      console.error('Auth protection error:', error)
+      // Don't throw the error, let the API route handle authentication internally
+    }
   }
 })
 

@@ -1,0 +1,18 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.33
+  - Local:        http://localhost:3000
+  - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1481ms
+ ✓ Compiled /middleware in 412ms (234 modules)
+ ○ Compiling /_not-found ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (175kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled /_not-found in 3.3s (987 modules)
+ GET /api/health 404 in 3423ms
+ ✓ Compiled in 190ms (353 modules)
+ ✓ Compiled in 10ms
+[?25h

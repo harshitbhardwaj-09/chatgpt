@@ -21,13 +21,22 @@ async function connectDB(): Promise<void> {
     return
   }
 
+  // If currently connecting, wait for it to complete
+  if (mongoose.connection.readyState === 2) {
+    return new Promise((resolve, reject) => {
+      mongoose.connection.once('connected', resolve)
+      mongoose.connection.once('error', reject)
+    })
+  }
+
   try {
     const options = {
       bufferCommands: false, // Disable mongoose buffering
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      family: 4 // Use IPv4, skip trying IPv6
+      maxPoolSize: 5, // Reduce connection pool size
+      serverSelectionTimeoutMS: 3000, // Reduce timeout
+      socketTimeoutMS: 30000, // Reduce socket timeout
+      family: 4, // Use IPv4, skip trying IPv6
+      maxIdleTimeMS: 30000, // Close connections after 30 seconds of inactivity
     }
 
     await mongoose.connect(MONGODB_URI, options)

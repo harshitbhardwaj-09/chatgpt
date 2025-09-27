@@ -2,16 +2,21 @@
 
 import type React from "react"
 import { useRef, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useChatStore } from "../lib/chat-store"
 import { Button } from "./ui/button"
 import { Textarea } from "./ui/textarea"
 import { ScrollArea } from "./ui/scroll-area"
-import { Send, Square } from "lucide-react"
+import { Send, Square, Paperclip, X } from "lucide-react"
 import { ChatMessage } from "./chat-message"
+import { SimpleFileUpload } from "./simple-file-upload"
+import { MemoryIndicator } from "./memory-indicator"
 
 export function ChatMain() {
+  const router = useRouter()
   const { 
     activeChat, 
+    chats,
     getCurrentChat, 
     addMessageToChat, 
     createNewChat, 
@@ -20,6 +25,7 @@ export function ChatMain() {
     setActiveChat,
     saveEditedMessage,
     removeMessagesFromIndex,
+    makeChatPermanent,
     streamingState,
     startStreaming,
     updateStreamingContent,
@@ -33,6 +39,11 @@ export function ChatMain() {
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [streamController, setStreamController] = useState<AbortController | null>(null)
+  const [attachedFiles, setAttachedFiles] = useState<any[]>([])
+  const [showFileUpload, setShowFileUpload] = useState(false)
+  const [memoryUsed, setMemoryUsed] = useState(false)
+  const [memoryCount, setMemoryCount] = useState(0)
+  const [contextTruncated, setContextTruncated] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -82,7 +93,7 @@ export function ChatMain() {
   }
 
   // Streaming helper function
-  const streamResponse = async (messages: any[], chatId: string, assistantMessageId: string, userMessage?: { content: string; role: string }) => {
+  const streamResponse = async (messages: any[], chatId: string, assistantMessageId: string, userMessage?: { content: string; role: string }, attachments?: any[]) => {
     const controller = new AbortController()
     setStreamController(controller)
     startStreaming(chatId, assistantMessageId)
@@ -97,14 +108,59 @@ export function ChatMain() {
           messages,
           conversationId: chatId,
           windowId: windowState.windowId,
-          userMessage: userMessage
+          userMessage: userMessage,
+          attachments: attachments
         }),
         signal: controller.signal,
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`API Error (${response.status}): ${errorText}`)
+        let errorMessage = `API Error (${response.status})`
+        
+        try {
+          const errorData = await response.json()
+          if (errorData.error) {
+            errorMessage = errorData.error
+            
+            // Handle specific error types
+            if (errorData.type === 'service_unavailable') {
+              errorMessage += '\n\nThe AI service is experiencing high demand. Please wait a moment and try again.'
+            } else if (errorData.type === 'configuration_error') {
+              errorMessage = 'Configuration error: Please check your API keys in the environment variables.'
+            }
+          }
+        } catch {
+          // If JSON parsing fails, use text
+          const errorText = await response.text()
+          errorMessage = `API Error (${response.status}): ${errorText}`
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      // Extract memory information and conversation ID from response headers
+      const memoryUsedHeader = response.headers.get('X-Memory-Used')
+      const memoryCountHeader = response.headers.get('X-Memory-Count')
+      const contextTruncatedHeader = response.headers.get('X-Context-Truncated')
+      const conversationIdHeader = response.headers.get('X-Conversation-Id')
+      const newConversationHeader = response.headers.get('X-New-Conversation')
+      
+      setMemoryUsed(memoryUsedHeader === 'true')
+      setMemoryCount(parseInt(memoryCountHeader || '0', 10))
+      setContextTruncated(contextTruncatedHeader === 'true')
+
+      // If this was a temporary chat that now has a permanent ID, update it
+      if (newConversationHeader === 'true' && conversationIdHeader && chatId) {
+        const currentChat = chats.find(c => c.id === chatId)
+        if (currentChat && currentChat.isTemporary) {
+          // Generate title from first user message
+          const firstUserMessage = currentChat.messages.find(m => m.role === 'user')
+          const generatedTitle = firstUserMessage ? 
+            generateChatTitle(firstUserMessage.content) : 
+            'New Conversation'
+          
+          makeChatPermanent(chatId, conversationIdHeader, generatedTitle)
+        }
       }
 
       const reader = response.body?.getReader()
@@ -231,31 +287,65 @@ export function ChatMain() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!input?.trim() || isLoading) return
+    if ((!input?.trim() && attachedFiles.length === 0) || isLoading) return
 
     let chatId = activeChat
+    let isNewChat = false
     if (!chatId) {
       chatId = createNewChat()
+      isNewChat = true
     }
 
-    // Add user message to store
+    // Prepare user message content with file context
+    let messageContent = input?.trim() || ""
+    
+    // Add file content as context if there are attachments
+    if (attachedFiles.length > 0) {
+      const fileContext = attachedFiles.map(file => {
+        return `[File: ${file.fileName}]\n${file.content}\n[End of ${file.fileName}]`
+      }).join('\n\n')
+      
+      messageContent = attachedFiles.length > 0 
+        ? `${messageContent}\n\nFiles attached:\n${fileContext}`
+        : messageContent
+    }
+
+    // Add user message to store with attachments
     if (chatId) {
+      const fileAttachments = attachedFiles.map(file => ({
+        id: file.id,
+        type: file.type,
+        fileName: file.fileName,
+        fileType: file.fileType,
+        content: file.content,
+        mimeType: file.mimeType,
+        size: file.size
+      }))
+
       addMessageToChat(chatId, {
-        content: input?.trim() || "",
+        content: input?.trim() || "", // Store original input, not file-enriched content
         role: "user",
+        attachments: fileAttachments.length > 0 ? fileAttachments : undefined
       })
 
       // Update chat title if this is the first message
       const chat = getCurrentChat()
       if (chat && chat.messages.length === 1) {
-        const title = generateChatTitle(input?.trim() || "")
+        const title = generateChatTitle(input?.trim() || attachedFiles[0]?.originalName || "New Chat")
         renameChat(chatId, title)
+      }
+
+      // Redirect to conversation URL if this is a new chat
+      if (isNewChat && chatId) {
+        // Use replace to avoid back button issues
+        router.replace(`/c/${chatId}`)
       }
     }
 
-    // Clear input immediately
-    const userInput = input.trim()
+    // Clear input and attachments immediately
+    const userInput = messageContent
     setInput("")
+    setAttachedFiles([])
     
     // Send message to API with streaming
     setIsLoading(true)
@@ -278,11 +368,22 @@ export function ChatMain() {
             content: userInput
           }]
 
+          // Convert attachedFiles to the format expected by the API
+          const attachmentsForAPI = attachedFiles.map(file => ({
+            id: file.id,
+            type: file.type,
+            fileName: file.fileName,
+            fileType: file.fileType,
+            content: file.content,
+            mimeType: file.mimeType,
+            size: file.size
+          }))
+
           // Stream the response
           await streamResponse(messagesToSend, chatId, assistantMessage.id, {
             content: userInput,
             role: 'user'
-          })
+          }, attachmentsForAPI)
         }
       }
     } catch (error) {
@@ -316,6 +417,15 @@ export function ChatMain() {
     }
   }
 
+  // File upload handlers  
+  const handleFileRemoved = (fileId: string) => {
+    setAttachedFiles(prev => prev.filter(f => f.id !== fileId))
+  }
+
+  const toggleFileUpload = () => {
+    setShowFileUpload(!showFileUpload)
+  }
+
   return (
     <main className="transition-width relative h-screen w-full flex-1 overflow-auto">
       <div className="group/thread h-full w-full">
@@ -336,6 +446,19 @@ export function ChatMain() {
                     </div>
                   ) : (
                     <>
+                      {/* Memory Indicator */}
+                      {messages.length > 0 && (memoryUsed || contextTruncated) && (
+                        <div className="w-full px-4 sm:px-6 lg:px-16 mb-4">
+                          <div className="mx-auto max-w-2xl lg:max-w-3xl">
+                            <MemoryIndicator 
+                              memoryUsed={memoryUsed}
+                              memoryCount={memoryCount}
+                              contextTruncated={contextTruncated}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      
                       {messages.map((message: any, index: number) => (
                         <article 
                           key={message.id}
@@ -390,20 +513,63 @@ export function ChatMain() {
             <div className="text-base mx-auto px-4 sm:px-6 lg:px-16">
               <div className="mx-auto max-w-2xl lg:max-w-3xl flex-1">
                 <div className="relative z-1 flex h-full max-w-full flex-1 flex-col">
+                  {/* File Upload Interface */}
+                  {showFileUpload && (
+                    <div className="absolute bottom-full left-0 mb-2 w-72 bg-token-main-surface-primary border border-token-border-medium rounded-lg shadow-lg z-10">
+                      <div className="p-3">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-medium text-token-text-primary">Add files</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowFileUpload(false)}
+                            className="p-1 hover:bg-token-main-surface-secondary rounded transition-colors"
+                          >
+                            <X className="h-4 w-4 text-token-text-secondary" />
+                          </button>
+                        </div>
+                        <SimpleFileUpload 
+                          onFilesUploaded={setAttachedFiles}
+                          onFileRemoved={handleFileRemoved}
+                          attachments={attachedFiles}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Attached Files Display */}
+                  {attachedFiles.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {attachedFiles.map((file) => (
+                        <div key={file.id} className="flex items-center gap-2 px-3 py-1.5 bg-token-main-surface-secondary rounded-full text-sm">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-token-text-secondary">
+                            <path d="M14.828 16.243L9.172 21.899C8.391 22.68 7.609 22.68 6.828 21.899C6.047 21.118 6.047 20.336 6.828 19.555L12.484 13.899L6.828 8.243C6.047 7.462 6.047 6.68 6.828 5.899C7.609 5.118 8.391 5.118 9.172 5.899L14.828 11.555L20.484 5.899C21.265 5.118 22.047 5.118 22.828 5.899C23.609 6.68 23.609 7.462 22.828 8.243L17.172 13.899L22.828 19.555C23.609 20.336 23.609 21.118 22.828 21.899C22.047 22.68 21.265 22.68 20.484 21.899L14.828 16.243Z"/>
+                          </svg>
+                          <span className="text-token-text-primary font-medium truncate max-w-32">{file.originalName}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleFileRemoved(file.id)}
+                            className="ml-1 p-0.5 hover:bg-token-main-surface-tertiary rounded-full transition-colors"
+                          >
+                            <X className="h-3 w-3 text-token-text-secondary" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <form className="group/composer w-full" onSubmit={onSubmit}>
                     <div className="flex items-center gap-3 overflow-clip bg-clip-padding p-3 shadow-short" style={{borderRadius: '28px', backgroundColor: 'var(--token-bg-primary)', border: '1px solid var(--token-border-light)'}}>
-                      {/* Leading section (Plus button) */}
+                      {/* Leading section (File attachment button) */}
                       <div className="flex-shrink-0">
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           className="composer-btn h-8 w-8"
-                          aria-label="Add files and more"
+                          onClick={toggleFileUpload}
+                          aria-label="Attach files"
                         >
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" className="icon">
-                            <path d="M9.33496 16.5V10.665H3.5C3.13273 10.665 2.83496 10.3673 2.83496 10C2.83496 9.63273 3.13273 9.33496 3.5 9.33496H9.33496V3.5C9.33496 3.13273 9.63273 2.83496 10 2.83496C10.3673 2.83496 10.665 3.13273 10.665 3.5V9.33496H16.5L16.6338 9.34863C16.9369 9.41057 17.165 9.67857 17.165 10C17.165 10.3214 16.9369 10.5894 16.6338 10.6514L16.5 10.665H10.665V16.5C10.665 16.8673 10.3673 17.165 10 17.165C9.63273 17.165 9.33496 16.8673 9.33496 16.5Z"/>
-                          </svg>
+                          <Paperclip className="h-4 w-4" />
                         </Button>
                       </div>
 

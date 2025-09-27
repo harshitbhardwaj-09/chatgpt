@@ -24,15 +24,17 @@ export async function POST(req: Request) {
       return new Response("Gemini API key not configured", { status: 500 })
     }
 
-    const { messages, conversationId, windowId, userMessage } = await req.json()
+    const { messages, conversationId, windowId, userMessage, attachments } = await req.json()
 
     if (!messages || !Array.isArray(messages)) {
       return new Response("Invalid messages format", { status: 400 })
     }
 
-    // Store user message in database if provided
+    // Store user message in database if provided (skip if temporary ID)
     let dbConversationId = conversationId
-    if (userMessage && userMessage.content) {
+    const isTemporaryId = conversationId?.startsWith('temp-')
+    
+    if (userMessage && userMessage.content && !isTemporaryId) {
       try {
         if (!dbConversationId) {
           // Create new conversation
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
             userId,
             userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : ''),
             undefined, // systemPrompt
-            'gemini-2.5-flash'
+            'gemini-1.5-flash'
           )
           dbConversationId = (conversation as any)._id.toString()
         }
@@ -59,12 +61,35 @@ export async function POST(req: Request) {
       }
     }
 
-    // Get context window for better AI responses
+    // Get context window with memory integration for better AI responses
     let contextMessages = messages
-    if (dbConversationId) {
+    let memoryContext: string[] = []
+    let memoryUsed = false
+    
+    if (dbConversationId && !isTemporaryId) {
       try {
-        const context = await ContextWindowService.buildContext(userId, dbConversationId, 4000)
+        // Extract current query from user message for memory search
+        const currentQuery = userMessage?.content || messages[messages.length - 1]?.content
+
+        const context = await ContextWindowService.buildContext(
+          userId, 
+          dbConversationId, 
+          4000, // tokenBudget
+          true, // includeSystemPrompt
+          currentQuery // for memory search
+        )
+        
         contextMessages = context.messages
+        memoryContext = context.memoryContext || []
+        memoryUsed = context.memoryUsed
+        
+        if (memoryUsed) {
+          console.log(`🧠 Memory integration: ${memoryContext.length} memories added to context`)
+        }
+        
+        if (context.truncated) {
+          console.log(`✂️ Context truncated: using ${context.messages.length} messages (${context.totalTokens} tokens)`)
+        }
       } catch (error) {
         console.error('Failed to build context window:', error)
         // Fall back to provided messages
@@ -72,10 +97,52 @@ export async function POST(req: Request) {
     }
 
     // Convert messages to proper format
-    const formattedMessages = contextMessages.map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+    let formattedMessages = contextMessages.map((msg: any) => ({
+      role: msg.role === 'user' ? 'user' as const : 
+            msg.role === 'system' ? 'system' as const : 'assistant' as const,
       content: msg.content,
     }))
+
+    // Add file attachment content if available
+    if (attachments && attachments.length > 0) {
+      let fileContextContent = ''
+      
+      for (const attachment of attachments) {
+        if (attachment.type === 'document' && attachment.content) {
+          fileContextContent += `\n\n--- File: ${attachment.fileName} (${attachment.fileType}) ---\n${attachment.content}\n--- End of ${attachment.fileName} ---`
+        } else if (attachment.type === 'image') {
+          fileContextContent += `\n\n--- Image: ${attachment.fileName} ---\n[Image content available for analysis]\n--- End of ${attachment.fileName} ---`
+        }
+      }
+      
+      if (fileContextContent) {
+        // Add file content as a system message
+        const fileSystemMessage = {
+          role: 'system' as const,
+          content: `The user has provided the following file(s) for context:${fileContextContent}\n\nPlease analyze and reference this content when answering the user's questions.`
+        }
+        
+        // Insert file context before user messages
+        const systemMessages = formattedMessages.filter(msg => msg.role === 'system')
+        const nonSystemMessages = formattedMessages.filter(msg => msg.role !== 'system')
+        
+        formattedMessages = [...systemMessages, fileSystemMessage, ...nonSystemMessages]
+      }
+    }
+
+    // Add memory context as system message if available
+    if (memoryUsed && memoryContext.length > 0) {
+      const memorySystemMessage = {
+        role: 'system' as const,
+        content: `Previous conversation context from memory:\n${memoryContext.map((memory, index) => `${index + 1}. ${memory}`).join('\n')}\n\nPlease use this context to provide more personalized and relevant responses.`
+      }
+      
+      // Insert memory context after any existing system messages but before user messages
+      const systemMessages = formattedMessages.filter(msg => msg.role === 'system')
+      const nonSystemMessages = formattedMessages.filter(msg => msg.role !== 'system')
+      
+      formattedMessages = [...systemMessages, memorySystemMessage, ...nonSystemMessages]
+    }
 
     // Create Google AI instance with explicit API key
     const google = createGoogleGenerativeAI({
@@ -86,10 +153,15 @@ export async function POST(req: Request) {
     let responseContent = ''
     let firstTokenTime: number | undefined
 
+    // Try different Gemini models as fallback
+    let modelToUse = "gemini-2.5-flash" // More stable model
+    
     const result = streamText({
-      model: google("gemini-2.5-flash"),
+      model: google(modelToUse),
       messages: formattedMessages,
       temperature: 0.7,
+      maxRetries: 2,
+      abortSignal: AbortSignal.timeout(30000), // 30 second timeout
       onChunk: ({ chunk }) => {
         if (!firstTokenTime) {
           firstTokenTime = Date.now()
@@ -102,7 +174,7 @@ export async function POST(req: Request) {
         const endTime = Date.now()
         
         try {
-          if (dbConversationId) {
+          if (dbConversationId && !isTemporaryId) {
             // Store assistant response in database
             const { message } = await MessageService.addMessage(
               userId,
@@ -112,7 +184,7 @@ export async function POST(req: Request) {
               {
                 windowId,
                 source: 'web',
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 finishReason,
                 usage
               }
@@ -152,13 +224,49 @@ export async function POST(req: Request) {
     return result.toTextStreamResponse({
       headers: {
         'X-Conversation-Id': dbConversationId || '',
-        'X-Window-Id': windowId || ''
+        'X-Window-Id': windowId || '',
+        'X-Memory-Used': memoryUsed ? 'true' : 'false',
+        'X-Memory-Count': memoryContext.length.toString(),
+        'X-New-Conversation': (!conversationId && dbConversationId) ? 'true' : 'false',
+        'X-Context-Truncated': contextMessages.length < messages.length ? 'true' : 'false'
       }
     })
   } catch (error) {
     console.error("Chat API Error:", error)
-    return new Response(`API Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { 
-      status: 500 
+    
+    // Handle specific Gemini API errors
+    if (error instanceof Error) {
+      if (error.message.includes('service is currently unavailable') || error.message.includes('503')) {
+        return new Response(JSON.stringify({
+          error: 'The AI service is temporarily unavailable. Please try again in a few moments.',
+          type: 'service_unavailable',
+          retryAfter: 30
+        }), { 
+          status: 503,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': '30'
+          }
+        })
+      }
+      
+      if (error.message.includes('API key')) {
+        return new Response(JSON.stringify({
+          error: 'AI service configuration error. Please check API keys.',
+          type: 'configuration_error'
+        }), { 
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+    }
+    
+    return new Response(JSON.stringify({
+      error: 'An unexpected error occurred. Please try again.',
+      type: 'unknown_error'
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
     })
   }
 }

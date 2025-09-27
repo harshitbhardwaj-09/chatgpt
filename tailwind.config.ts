@@ -24,6 +24,7 @@ const config: Config = {
         'token-border-medium': 'var(--token-border-medium)',
         'token-sidebar-surface-primary': 'var(--token-sidebar-surface-primary)',
         'token-sidebar-surface-secondary': 'var(--token-sidebar-surface-secondary)',
+        'token-sidebar-surface-tertiary': 'var(--token-sidebar-surface-tertiary)',
         
         // Standard shadcn colors
         border: "hsl(var(--border))",
@@ -98,5 +99,6 @@ const config: Config = {
 }
 
 export default config
+
 
 

@@ -3,17 +3,22 @@
 import { useState, useEffect } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
-import { ChatGPTSidebar } from "./chatgpt-sidebar"
+import { ChatSidebar } from "./chat-sidebar"
 import { ChatMain } from "./chat-main"
 import { Button } from "./ui/button"
 import { Menu, Share, MoreHorizontal } from "lucide-react"
 import { useChatStore } from "@/lib/chat-store"
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  conversationId?: string;
+}
+
+export function ChatInterface({ conversationId }: ChatInterfaceProps = {}) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { user, isLoaded } = useUser()
   const router = useRouter()
-  const { initializeWindow, loadConversationsFromDB } = useChatStore()
+  const { initializeWindow, loadConversationsFromDB, setActiveChat, activeChat, chats, getCurrentChat } = useChatStore()
 
   // Authentication guard and initialization
   useEffect(() => {
@@ -28,11 +33,48 @@ export function ChatInterface() {
       initializeWindow()
       
       // Load user's conversations from database
-      loadConversationsFromDB().catch(error => {
+      loadConversationsFromDB().then(() => {
+        // If conversationId is provided, set it as active
+        if (conversationId && conversationId !== activeChat) {
+          setActiveChat(conversationId)
+        }
+      }).catch(error => {
         console.error('Failed to load conversations:', error)
+        // If conversation doesn't exist, redirect to home
+        if (conversationId) {
+          router.push('/')
+        }
       })
     }
-  }, [isLoaded, user, router, initializeWindow, loadConversationsFromDB])
+  }, [isLoaded, user, router, initializeWindow, loadConversationsFromDB, conversationId, activeChat, setActiveChat])
+
+  // Set active chat after conversations are loaded
+  useEffect(() => {
+    if (conversationId && chats.length > 0 && conversationId !== activeChat) {
+      const foundChat = chats.find(c => c.id === conversationId)
+      if (foundChat) {
+        setActiveChat(conversationId)
+      } else {
+        // Conversation not found, redirect to home
+        router.push('/')
+      }
+    }
+  }, [chats, conversationId, activeChat, setActiveChat, router])
+
+  // Handle navigation when temporary chats become permanent
+  useEffect(() => {
+    const currentChat = getCurrentChat()
+    
+    // If we're on home page with a permanent chat, navigate to its URL
+    if (!conversationId && currentChat && !currentChat.isTemporary && currentChat.permanentId) {
+      router.push(`/c/${currentChat.permanentId}`)
+    }
+    
+    // If we're on a conversation page but the chat is temporary, navigate to home
+    if (conversationId && currentChat && currentChat.isTemporary) {
+      router.push('/')
+    }
+  }, [conversationId, getCurrentChat, router, chats])
 
   // Show loading state while authentication is being checked
   if (!isLoaded) {
@@ -64,13 +106,17 @@ export function ChatInterface() {
       {/* Sidebar Rail */}
       <div className={`
         relative z-21 h-full shrink-0 overflow-hidden border-e transition-all duration-300
-        ${sidebarOpen ? 'w-64' : 'w-0'} 
+        ${sidebarOpen ? (sidebarCollapsed ? 'w-16' : 'w-64') : 'w-0'} 
         ${sidebarOpen ? 'fixed md:relative' : 'md:relative'}
         ${sidebarOpen ? 'inset-y-0 left-0 md:inset-auto' : ''}
         ${sidebarOpen ? 'z-50 md:z-21' : ''}
         max-md:${sidebarOpen ? 'block' : 'hidden'} md:block
       `} style={{borderColor: 'var(--token-border-light)'}}>
-        <ChatGPTSidebar isCollapsed={!sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <ChatSidebar 
+          onClose={() => setSidebarOpen(false)} 
+          isCollapsed={sidebarCollapsed} 
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        />
       </div>
 
       {/* Main Content */}
@@ -120,7 +166,15 @@ export function ChatInterface() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={() => {
+                if (!sidebarOpen) {
+                  setSidebarOpen(true)
+                } else if (!sidebarCollapsed) {
+                  setSidebarCollapsed(true)
+                } else {
+                  setSidebarOpen(false)
+                }
+              }}
               className="mr-2 pointer-events-auto hoverable h-9 w-9 rounded-lg"
             >
               <Menu className="h-5 w-5" style={{color: 'var(--token-text-secondary)'}} />
