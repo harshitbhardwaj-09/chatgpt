@@ -94,6 +94,7 @@ interface WindowConversationState {
 interface ChatStore {
   chats: Chat[]
   activeChat: string | null
+  lastPromotedChatId?: string | null
   editState: EditState
   streamingState: StreamingState
   syncState: SyncState
@@ -107,7 +108,7 @@ interface ChatStore {
   deleteChat: (chatId: string) => void
   renameChat: (chatId: string, newTitle: string) => void
   setActiveChat: (chatId: string) => void
-  addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }) => void
+  addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }, options?: { skipSync?: boolean }) => Promise<string>
   makeChatPermanent: (tempChatId: string, permanentId: string, generatedTitle?: string) => void
   getCurrentChat: () => Chat | null
   generateChatTitle: (firstMessage: string) => string
@@ -125,7 +126,7 @@ interface ChatStore {
   updateMessageContent: (chatId: string, messageId: string, content: string) => void
   // Database sync functionality
   loadConversationsFromDB: () => Promise<void>
-  syncChatToDB: (chatId: string) => Promise<void>
+  syncChatToDB: (chatId: string) => Promise<string | null>
   syncMessageToDB: (chatId: string, message: { content: string; role: "user" | "assistant" }) => Promise<void>
   syncEditToDB: (chatId: string, messageId: string, content: string) => Promise<void>
   deleteChatFromDB: (chatId: string) => Promise<void>
@@ -150,6 +151,7 @@ export const useChatStore = create<ChatStore>()(
     (set, get) => ({
       chats: [],
       activeChat: null,
+      lastPromotedChatId: null,
       editState: {
         messageId: null,
         originalContent: "",
@@ -296,31 +298,43 @@ export const useChatStore = create<ChatStore>()(
               : chat
           ),
           activeChat: state.activeChat === tempChatId ? permanentId : state.activeChat,
+          lastPromotedChatId: permanentId,
         }))
       },
 
-      addMessageToChat: (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }) => {
+      addMessageToChat: async (chatId: string, message: { content: string; role: "user" | "assistant"; attachments?: FileAttachment[] }, options?: { skipSync?: boolean }) => {
         const state = get()
         const chat = state.chats.find(c => c.id === chatId)
         
-        // If this is the first message and chat doesn't exist in DB yet, create it
-        if (chat && chat.messages.length === 0 && !chatId.includes('ObjectId')) {
-          get().syncChatToDB(chatId).then(() => {
-            // After creating chat in DB, sync the message
-            const updatedState = get()
-            const updatedChat = updatedState.chats.find(c => c.id === chatId || c.title === chat.title)
-            if (updatedChat && message.content.trim()) {
-              get().syncMessageToDB(updatedChat.id, message)
+        let finalChatId = chatId
+        
+        // If this is the first message and chat is still temporary, create it in DB first
+        if (chat && chat.messages.length === 0 && chat.id.startsWith('temp-')) {
+          try {
+            const newId = await get().syncChatToDB(chatId)
+            if (newId) {
+              finalChatId = newId
             }
-          })
-        } else if (message.content.trim()) {
-          // Sync message to existing conversation
-          get().syncMessageToDB(chatId, message)
+          } catch (error) {
+            console.error('Failed to create conversation in DB:', error)
+            // Continue with temp ID and try to sync later
+          }
+        }
+        
+        // Sync message to DB (using final chat ID), unless explicitly skipped
+        if (!options?.skipSync && message.content.trim()) {
+          try {
+            await get().syncMessageToDB(finalChatId, message)
+          } catch (error) {
+            console.error('Failed to sync message to DB:', error)
+            // Continue to add to local state even if DB sync fails
+          }
         }
 
+        // Add to local state using the final chat id (handles temp -> permanent swap)
         set((state) => ({
           chats: state.chats.map((chat) =>
-            chat.id === chatId
+            chat.id === finalChatId
               ? {
                   ...chat,
                   messages: [
@@ -337,6 +351,8 @@ export const useChatStore = create<ChatStore>()(
               : chat,
           ),
         }))
+        
+        return finalChatId
       },
 
       getCurrentChat: () => {
@@ -562,7 +578,7 @@ export const useChatStore = create<ChatStore>()(
         try {
           const state = get()
           const chat = state.chats.find(c => c.id === chatId)
-          if (!chat) return
+          if (!chat) return null
 
           // Create conversation in database
           const response = await fetch('/api/conversations', {
@@ -579,8 +595,11 @@ export const useChatStore = create<ChatStore>()(
           
           // Mark chat as permanent so routing/UI logic can use stable ID
           get().makeChatPermanent(chatId, conversation._id, chat.title)
+
+          return conversation._id as string
         } catch (error) {
           console.error('Failed to sync chat to database:', error)
+          return null
         }
       },
 

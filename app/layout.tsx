@@ -34,6 +34,13 @@ export default function RootLayout({
     >
       <html lang="en" suppressHydrationWarning>
         <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased h-screen w-screen overflow-hidden`}>
+          {/* Skip to content for keyboard users */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-black focus:text-white focus:p-2"
+          >
+            Skip to main content
+          </a>
           <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             <Suspense fallback={null}>{children}</Suspense>
           </ThemeProvider>

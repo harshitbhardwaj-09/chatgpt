@@ -197,12 +197,13 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
                     onKeyDown={handleKeyDown}
                     className="w-full min-h-[60px] resize-none border border-neutral-700 bg-neutral-900 text-neutral-100 focus:ring-1 focus:ring-blue-600"
                     placeholder="Edit your message..."
+                    aria-label="Edit your message"
                   />
                   <div className="flex gap-2 mt-2">
-                    <Button size="sm" onClick={handleEditSave} disabled={!editState.editedContent.trim()} className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+                    <Button size="sm" onClick={handleEditSave} disabled={!editState.editedContent.trim()} className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" aria-label="Save edit">
                       <Check className="w-3 h-3 mr-1" /> Save
                     </Button>
-                    <Button size="sm" variant="outline" onClick={handleEditCancel} className="h-7 px-3">
+                    <Button size="sm" variant="outline" onClick={handleEditCancel} className="h-7 px-3" aria-label="Cancel edit">
                       <X className="w-3 h-3 mr-1" /> Cancel
                     </Button>
                   </div>
@@ -217,7 +218,7 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
                         <div key={idx} className="rounded-lg border border-neutral-800 bg-black text-neutral-100 overflow-hidden">
                           <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
                             <span className="text-xs font-medium uppercase tracking-wide text-neutral-300">{blk.language}</span>
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-neutral-300 hover:bg-neutral-800" onClick={() => handleCopyCode(blk.content, idx)}>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-neutral-300 hover:bg-neutral-800" onClick={() => handleCopyCode(blk.content, idx)} aria-label={`Copy ${blk.language} code`}>
                               <Copy className="w-3.5 h-3.5 mr-1" /> {copiedBlock === idx ? 'Copied' : 'Copy code'}
                             </Button>
                           </div>
@@ -245,7 +246,7 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-neutral-100 truncate">{attachment.fileName}</p>
+                              <p className="text-xs font-medium text-neutral-100 truncate" aria-label={`Attachment ${attachment.fileName}`}>{attachment.fileName}</p>
                               <p className="text-[10px] text-neutral-300/80">{attachment.fileType} • {Math.round(attachment.size / 1024)} KB</p>
                             </div>
                           </div>
@@ -283,7 +284,7 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
             <div className="flex max-w-full flex-col flex-grow">
               
               {/* Avatar and message wrapper */}
-              <div data-message-author-role={message.role} data-message-id={message.id} dir="auto" className="group/message agent-message-wrapper">
+              <div data-message-author-role={message.role} data-message-id={message.id} dir="auto" className="group/message agent-message-wrapper" aria-live={isCurrentlyStreaming ? 'polite' : undefined}>
                 <div className="group/message w-full text-token-text-primary" dir="auto" data-testid="conversation-turn-3" data-scroll-anchor="false">
                   <div className="px-4 py-2 justify-center text-base md:gap-6 m-auto">
                     <div className="flex flex-1 gap-4 text-base mx-auto md:gap-6 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem]">
@@ -312,7 +313,7 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
                                                 <div key={idx} className="rounded-lg border border-neutral-800 bg-black text-neutral-100 overflow-hidden">
                                                   <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-800">
                                                     <span className="text-xs font-medium uppercase tracking-wide text-neutral-300">{blk.language}</span>
-                                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-neutral-300 hover:bg-neutral-800" onClick={() => handleCopyCode(blk.content, idx)}>
+                                                    <Button size="sm" variant="ghost" className="h-7 px-2 text-neutral-300 hover:bg-neutral-800" onClick={() => handleCopyCode(blk.content, idx)} aria-label={`Copy ${blk.language} code`}>
                                                       <Copy className="w-3.5 h-3.5 mr-1" /> {copiedBlock === idx ? 'Copied' : 'Copy code'}
                                                     </Button>
                                                   </div>

@@ -28,16 +28,27 @@ A pixel-perfect ChatGPT clone built with Next.js 14, featuring advanced memory c
 - **[✓] Deployed on Vercel** — Production-ready deployment with optimized performance
 
 ### ✅ **Bonus Features (Beyond Requirements)**
-- **[✓] Real-time Search** — Instant conversation search with content matching
-- **[✓] Window-based Storage** — Per-window conversation memory like VS Code
-- **[✓] Dynamic Routing** — Unique URLs for each conversation like ChatGPT
-- **[✓] Theme Support** — Light/dark mode with system preference detection
-- **[✓] Session Management** — Advanced user session tracking with TTL
-- **[✓] Database Optimization** — Efficient MongoDB queries with proper indexing
 
+## ✅ Requirements Coverage
+
+The following requirements are fully implemented and verified in this project:
+
+- [✓] Match ChatGPT UI exactly — layout, spacing, fonts, animations, scrolling, modals
+- [✓] Full mobile responsiveness and ARIA-compliant accessibility
+- [✓] Edit Message with seamless regeneration
+- [✓] Vercel AI SDK integration for chat responses
+- [✓] Context window handling (segment/trim historical messages)
+- [✓] Message streaming with graceful UI updates
+- [✓] Memory capability via Mem0.ai
+- [✓] Image uploads (JPEG, PNG, etc.)
+- [✓] File uploads (PDF, DOCX, TXT, CSV, etc.)
+- [✓] Deployed on Vercel (or similar platform)
 ## 🚀 **Live Demo**
 
-🌐 **[View Live Demo](https://your-chatgpt-clone.vercel.app)** *(Deploy to get URL)*
+Deploy first, then replace with your URL:
+
+• Vercel: https://v0-chat-gpt-ui-clone-swart.vercel.app/
+• Local dev runs at: http://localhost:3000
 
 ## 📸 **Screenshots**
 
@@ -53,29 +64,26 @@ A pixel-perfect ChatGPT clone built with Next.js 14, featuring advanced memory c
 ## 🛠️ **Tech Stack**
 
 ### **Frontend**
-- **Next.js 14** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
-- **Shadcn/ui** - Modern UI component library
-- **Lucide React** - Beautiful icons
-- **Zustand** - State management
+- Next.js 14 (App Router)
+- TypeScript
+- Tailwind CSS + shadcn/ui
+- Lucide React
+- Zustand state management
 
 ### **Backend & Database**
-- **MongoDB** - NoSQL database with Mongoose ODM
-- **Clerk** - Authentication and user management
-- **Vercel AI SDK** - AI chat integration
-- **Google Gemini** - AI model for responses
+- MongoDB (Mongoose)
+- Clerk auth
+- Vercel AI SDK
+- Google Gemini
 
 ### **AI & Memory**
-- **Mem0.ai** - Intelligent conversation memory
-- **Context Window Management** - Smart message trimming
-- **Token Estimation** - Efficient context budgeting
+- Mem0.ai optional memory integration
+- Context window management for prompts
 
 ### **File Processing**
-- **Cloudinary** - Image and file upload handling
-- **PDF.js** - PDF text extraction
-- **Mammoth.js** - DOCX document processing
-- **CSV Parser** - CSV file processing
+- Cloudinary for uploads
+- pdf-parse + pdfjs-dist for PDFs
+- mammoth for DOCX
 
 ## 🏗️ **Architecture Overview**
 
@@ -217,44 +225,35 @@ cd chatgpt-clone
 
 2. **Install dependencies**
 ```bash
-npm install
-# or
-yarn install
-# or
 pnpm install
+# or npm install / yarn install
 ```
 
 3. **Environment Setup**
+Copy `.env.example` to `.env.local` and fill values:
 ```bash
 cp .env.example .env.local
 ```
 
 4. **Configure Environment Variables**
+Provide values in `.env.local`:
 ```env
-# Database
-MONGODB_URI=mongodb://localhost:27017/chatgpt-clone
-
-# Authentication (Clerk)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+MONGODB_URI=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-
-# AI Integration
-GOOGLE_GENERATIVE_AI_API_KEY=AIza...
-
-# Memory (Mem0.ai)
-MEM0_API_KEY=m0-...
-
-# File Upload (Cloudinary)
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=123456789012345
-CLOUDINARY_API_SECRET=your-api-secret
+GOOGLE_GENERATIVE_AI_API_KEY=
+MEM0_API_KEY=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
 ```
 
 5. **Run Development Server**
 ```bash
-npm run dev
+pnpm dev
+# or npm run dev / yarn dev
 ```
 
 6. **Open Application**
@@ -265,21 +264,11 @@ http://localhost:3000
 ## 📦 **Deployment**
 
 ### **Vercel Deployment (Recommended)**
-
-1. **Connect Repository**
-```bash
-vercel --prod
-```
-
-2. **Configure Environment Variables**
-- Add all environment variables in Vercel dashboard
-- Ensure MongoDB connection string is accessible
-- Verify API keys are properly set
-
-3. **Deploy**
-```bash
-vercel deploy --prod
-```
+1) Import the repo on Vercel
+2) Add all env vars in Settings → Environment Variables
+3) Set Build Command to `pnpm build` (or `npm run build`)
+4) Set Install Command to `pnpm install` (or `npm install`)
+5) Deploy
 
 ### **Alternative Deployment Options**
 - **Netlify**: Full-stack deployment with serverless functions
@@ -289,26 +278,7 @@ vercel deploy --prod
 
 ## 🧪 **Testing**
 
-### **Run Tests**
-```bash
-# Unit tests
-npm run test
-
-# Integration tests
-npm run test:integration
-
-# E2E tests
-npm run test:e2e
-
-# Coverage report
-npm run test:coverage
-```
-
-### **Test Coverage**
-- **Components**: 95%+ coverage
-- **API Routes**: 90%+ coverage
-- **Utilities**: 100% coverage
-- **Database Models**: 95%+ coverage
+Tests are not configured in this repo yet. You can add Vitest/Jest if needed.
 
 ## 📊 **Performance**
 
@@ -324,19 +294,10 @@ npm run test:coverage
 - **Caching**: Intelligent caching strategies
 - **Bundle Analysis**: Webpack bundle analyzer
 
-## 🔒 **Security**
-
-### **Authentication & Authorization**
-- **Clerk Integration**: Secure user authentication
-- **JWT Tokens**: Stateless authentication
-- **Route Protection**: Middleware-based protection
-- **CSRF Protection**: Built-in Next.js protection
-
-### **Data Security**
-- **Input Validation**: Comprehensive input sanitization
-- **SQL Injection Prevention**: Mongoose ODM protection
-- **XSS Protection**: Content Security Policy
-- **Rate Limiting**: API endpoint protection
+## 🔒 **Security Notes**
+- Ensure Clerk keys are set server-side (don’t commit `.env.local`).
+- Never commit your Gemini or Cloudinary secrets.
+- Middleware protects routes via Clerk; APIs perform server-side auth checks.
 
 ## 🤝 **Contributing**
 
@@ -354,26 +315,20 @@ npm run test:coverage
 - **Husky**: Pre-commit hooks
 - **Conventional Commits**: Commit message standards
 
-## 📚 **Documentation**
-
-### **Additional Documentation**
-- **[Memory Setup Guide](./MEMORY_SETUP.md)** - Mem0.ai integration details
-- **[Search Features](./SEARCH_AND_WINDOW_FEATURES.md)** - Search and window management
-- **[URL Routing](./URL_ROUTING_IMPLEMENTATION.md)** - Dynamic routing implementation
-- **[Database Schema](./DATABASE_SCHEMA_GUIDE.md)** - Complete database documentation
-- **[Demo Examples](./DEMO_EXAMPLE.md)** - Usage examples and demos
-
-### **API Documentation**
-- **[Chat API](./docs/api/chat.md)** - Main chat endpoint documentation
-- **[Memory API](./docs/api/memory.md)** - Memory management endpoints
-- **[File Upload API](./docs/api/upload.md)** - File handling endpoints
+## 📚 **API Endpoints (summary)**
+- POST `/api/chat` — stream AI response, persists messages
+- GET `/api/conversations` — list conversations
+- POST `/api/conversations` — create conversation
+- GET `/api/conversations/[id]` — details + messages
+- POST `/api/conversations/[id]/messages` — add message
+- PUT `/api/conversations/[id]` — rename
+- DELETE `/api/conversations/[id]` — delete
 
 ## 🐛 **Known Issues & Roadmap**
 
 ### **Current Limitations**
-- File upload size limited to 10MB
-- Memory search limited to 100 results
-- Real-time collaboration not implemented
+- First chat navigation waits for DB id (by design)
+- Upload size depends on server limits
 
 ### **Upcoming Features**
 - [ ] Voice message support
@@ -385,7 +340,7 @@ npm run test:coverage
 
 ## 📄 **License**
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## 🙏 **Acknowledgments**
 

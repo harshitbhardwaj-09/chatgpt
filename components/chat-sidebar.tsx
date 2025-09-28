@@ -198,20 +198,21 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
 
 
   return (
-    <div className={`h-full bg-token-sidebar-surface-primary flex flex-col transition-all duration-300 ease-in-out ${
+    <aside className={`h-full bg-token-sidebar-surface-primary flex flex-col transition-all duration-300 ease-in-out ${
       isCollapsed ? 'w-16' : 'w-64'
-    }`}>
+    }`} aria-label="Sidebar navigation">
       {/* Header with Logo and Collapse Button */}
       <div className={`p-3 flex items-center ${
         isCollapsed ? 'justify-center' : 'justify-between'
       }`}>
         {isCollapsed ? (
-          <Button 
+       <Button 
              variant="ghost" 
              size="icon" 
              className="h-8 w-8 text-token-text-secondary hover:bg-token-sidebar-surface-secondary"
              onClick={onToggle}
              title="Expand sidebar"
+         aria-label="Expand sidebar"
           >
             <img 
               src="/gpt_iconw.png" 
@@ -236,12 +237,25 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
               alt="ChatGPT Logo" 
               className="w-8 h-8 rounded-lg object-cover hidden dark:block"
             />
+            {/* Mobile: Close sidebar (closes sheet) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 md:hidden text-token-text-secondary hover:bg-token-sidebar-surface-secondary"
+              onClick={onClose}
+              title="Close sidebar"
+              aria-label="Close sidebar"
+            >
+              <Sidebar className="h-4 w-4" />
+            </Button>
+            {/* Tablet/Desktop: Collapse toggle */}
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-8 w-8 text-token-text-secondary hover:bg-token-sidebar-surface-secondary"
+              className="h-8 w-8 hidden md:inline-flex text-token-text-secondary hover:bg-token-sidebar-surface-secondary"
               onClick={onToggle}
               title="Collapse sidebar"
+              aria-label="Collapse sidebar"
             >
               <Sidebar className="h-4 w-4" />
             </Button>
@@ -258,6 +272,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           }`}
           variant="ghost"
           title={isCollapsed ? 'New chat' : undefined}
+          aria-label="New chat"
         >
           <Edit3 className="h-4 w-4" />
           {!isCollapsed && 'New chat'}
@@ -284,6 +299,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                   onFocus={handleSearchFocus}
                   onBlur={handleSearchBlur}
                   className="w-full h-10 bg-transparent border border-token-border-light hover:bg-token-sidebar-surface-secondary text-token-text-primary placeholder-token-text-secondary font-normal rounded-lg pl-10 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Search chats"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-token-text-secondary" />
                 {searchState.query && (
@@ -291,6 +307,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                     type="button"
                     onClick={handleSearchClear}
                     className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-token-sidebar-surface-secondary rounded transition-colors"
+                    aria-label="Clear search"
                   >
                     <X className="h-3 w-3 text-token-text-secondary" />
                   </button>
@@ -305,6 +322,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           }`}
           variant="ghost"
           title={isCollapsed ? 'Library' : undefined}
+          aria-label="Library"
         >
           <BookOpen className="h-4 w-4" />
           {!isCollapsed && 'Library'}
@@ -322,6 +340,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           }`}
           variant="ghost"
           title={isCollapsed ? 'Sora' : undefined}
+          aria-label="Sora"
         >
           <Play className="h-4 w-4" />
           {!isCollapsed && 'Sora'}
@@ -333,6 +352,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           }`}
           variant="ghost"
           title={isCollapsed ? 'GPTs' : undefined}
+          aria-label="GPTs"
         >
           <Grid3X3 className="h-4 w-4" />
           {!isCollapsed && 'GPTs'}
@@ -344,6 +364,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           }`}
           variant="ghost"
           title={isCollapsed ? 'Projects' : undefined}
+          aria-label="Projects"
         >
           <FolderOpen className="h-4 w-4" />
           {!isCollapsed && 'Projects'}
@@ -378,13 +399,13 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
            <ScrollArea className="h-full">
              <div className="space-y-1">
                {filteredChats.length === 0 && searchState.isSearching ? (
-                 <div className="text-center text-token-text-secondary text-sm py-8">
+                 <div className="text-center text-token-text-secondary text-sm py-8" role="status" aria-live="polite">
                    <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                    <p>No chats found for "{searchState.query}"</p>
                    <p className="text-xs mt-1 opacity-75">Try a different search term</p>
                  </div>
                ) : filteredChats.length === 0 ? (
-                 <div className="text-center text-gray-400 text-sm py-8">
+                 <div className="text-center text-gray-400 text-sm py-8" role="status" aria-live="polite">
                    No chats yet. Create your first chat!
                  </div>
                ) : (
@@ -397,6 +418,11 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                       : "hover:bg-token-sidebar-surface-secondary text-token-text-secondary"
                   } text-sm`}
                   onClick={() => handleChatSelect(chat.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={activeChat === chat.id}
+                  aria-label={`Open chat ${chat.title || 'Untitled Chat'}`}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleChatSelect(chat.id) }}
                 >
                   <span className="flex-1 truncate">{chat.title}</span>
                   {chat.isTemporary && !chat.permanentId && (
@@ -421,6 +447,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                           e.stopPropagation()
                           handleRenameChat(chat.id, chat.title || 'Untitled Chat')
                         }}
+                        aria-label="Rename chat"
                       >
                         <Edit3 className="h-4 w-4 mr-2" />
                         Rename
@@ -431,6 +458,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                           handleDeleteChat(chat.id, chat.title || 'Untitled Chat')
                         }}
                         className="text-destructive"
+                        aria-label="Delete chat"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
@@ -487,6 +515,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                   variant="ghost" 
                   size="sm"
                   className="text-xs bg-token-sidebar-surface-secondary hover:bg-token-sidebar-surface-tertiary text-token-text-primary px-3 py-1 h-7 rounded-md"
+                  aria-label="Upgrade plan"
                 >
                   Upgrade
                 </Button>
@@ -524,6 +553,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                   }
                 }}
                 autoFocus
+                aria-label="Chat name"
               />
             </div>
           </div>
@@ -557,6 +587,6 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </aside>
   )
 }

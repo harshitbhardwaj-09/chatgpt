@@ -159,7 +159,7 @@ export function ChatMain() {
         }
       }
 
-      const reader = response.body?.getReader()
+  const reader = response.body?.getReader()
       if (!reader) throw new Error('No response stream available')
 
       const decoder = new TextDecoder()
@@ -255,7 +255,7 @@ export function ChatMain() {
       setIsLoading(true)
       try {
         // Add placeholder assistant message for streaming
-        addMessageToChat(activeChat, {
+        await addMessageToChat(activeChat, {
           content: "",
           role: "assistant",
         })
@@ -270,7 +270,7 @@ export function ChatMain() {
         await streamResponse(messagesToSend, activeChat, assistantMessage.id)
       } catch (error) {
         console.error('Error regenerating response:', error)
-        addMessageToChat(activeChat, {
+        await addMessageToChat(activeChat, {
           content: "Sorry, there was an error regenerating the response. Please try again.",
           role: "assistant",
         })
@@ -283,7 +283,7 @@ export function ChatMain() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if ((!input?.trim() && attachedFiles.length === 0) || isLoading) return
+  if ((!(input && input.trim().length > 0) && attachedFiles.length === 0) || isLoading) return
 
     let chatId = activeChat
     let isNewChat = false
@@ -318,11 +318,15 @@ export function ChatMain() {
         size: file.size
       }))
 
-      addMessageToChat(chatId, {
+      // Await to ensure DB creation completes for temp chats
+      const finalChatId = await addMessageToChat(chatId, {
         content: input?.trim() || "", // Store original input, not file-enriched content
         role: "user",
         attachments: fileAttachments.length > 0 ? fileAttachments : undefined
-      })
+      }, { skipSync: true })
+      
+      // Use the final chat ID for subsequent operations
+      chatId = finalChatId
 
       // Update chat title if this is the first message
       const chat = getCurrentChat()
@@ -345,21 +349,19 @@ export function ChatMain() {
     try {
       // Add placeholder assistant message for streaming
       if (chatId) {
-        addMessageToChat(chatId, {
+        await addMessageToChat(chatId, {
           content: "",
           role: "assistant",
-        })
+        }, { skipSync: true })
 
         // Get the new assistant message ID
         const updatedChatData = getCurrentChat()
         if (updatedChatData && updatedChatData.messages.length > 0) {
           const assistantMessage = updatedChatData.messages[updatedChatData.messages.length - 1]
           
-          // Prepare messages for API
-          const messagesToSend = [...(currentChat?.messages || []), {
-            role: 'user' as const,
-            content: userInput
-          }]
+          // Prepare messages for API using the latest chat state (exclude the assistant placeholder we just added)
+          const freshChat = getCurrentChat()
+          const messagesToSend = (freshChat?.messages || []).slice(0, -1)
 
           // Convert attachedFiles to the format expected by the API
           const attachmentsForAPI = attachedFiles.map(file => ({
@@ -459,6 +461,7 @@ export function ChatMain() {
                           style={{color: 'var(--token-text-primary)'}}
                           tabIndex={-1}
                           dir="auto"
+                          aria-live={isLoading && index === messages.length - 1 && message.role === 'assistant' ? 'polite' : undefined}
                         >
                           <div className="text-base my-auto mx-auto pt-3 px-4 sm:px-6 lg:px-16">
                             <div className="mx-auto max-w-2xl lg:max-w-3xl flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col" tabIndex={-1}>
@@ -478,7 +481,7 @@ export function ChatMain() {
                         </article>
                       ))}
                       {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "user" && (
-                        <article className="w-full focus:outline-none" tabIndex={-1} dir="auto" style={{color: 'var(--token-text-primary)'}}>
+                        <article className="w-full focus:outline-none" tabIndex={-1} dir="auto" style={{color: 'var(--token-text-primary)'}} aria-live="polite" role="status">
                           <div className="text-base my-auto mx-auto pt-3 px-4 sm:px-6 lg:px-16">
                             <div className="mx-auto max-w-2xl lg:max-w-3xl flex-1 group/turn-messages focus-visible:outline-hidden relative flex w-full min-w-0 flex-col" tabIndex={-1}>
                               <ChatMessage 
@@ -503,7 +506,7 @@ export function ChatMain() {
 
           {/* Composer Area */}
           <div className="group/thread-bottom-container relative isolate z-10 w-full basis-auto" style={{backgroundColor: 'var(--token-main-surface-primary)'}}>
-            <div className="text-base mx-auto px-4 sm:px-6 lg:px-16">
+            <div className="text-base mx-auto px-4 sm:px-6 lg:px-16 pb-[env(safe-area-inset-bottom)]">
               <div className="mx-auto max-w-2xl lg:max-w-3xl flex-1">
                 <div className="relative z-1 flex h-full max-w-full flex-1 flex-col">
                   {/* File Upload Interface */}
@@ -550,7 +553,7 @@ export function ChatMain() {
                     </div>
                   )}
 
-                  <form className="group/composer w-full" onSubmit={onSubmit}>
+                  <form className="group/composer w-full" onSubmit={onSubmit} role="form" aria-label="Message composer">
                     <div className="flex items-center gap-3 overflow-clip bg-clip-padding p-3 shadow-short" style={{borderRadius: '28px', backgroundColor: 'var(--token-bg-primary)', border: '1px solid var(--token-border-light)'}}>
                       {/* Leading section (File attachment button) */}
                       <div className="flex-shrink-0">
@@ -582,6 +585,7 @@ export function ChatMain() {
                           disabled={isLoading}
                           rows={1}
                           autoFocus
+                          aria-label="Message input"
                           style={{ 
                             color: 'var(--token-text-primary)',
                             backgroundColor: 'transparent'
@@ -612,6 +616,7 @@ export function ChatMain() {
                               variant="ghost"
                               className="composer-submit-btn h-9 w-9 text-black dark:text-white"
                               title="Stop generating"
+                              aria-label="Stop generating"
                             >
                               <Square className="h-4 w-4" />
                             </Button>
@@ -622,6 +627,7 @@ export function ChatMain() {
                               className="composer-submit-btn composer-submit-button-color h-9 w-9" 
                               disabled={!input?.trim()}
                               title="Send message"
+                              aria-label="Send message"
                             >
                               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" className="icon">
                                 <path d="M8.99992 16V6.41407L5.70696 9.70704C5.31643 10.0976 4.68342 10.0976 4.29289 9.70704C3.90237 9.31652 3.90237 8.6835 4.29289 8.29298L9.29289 3.29298L9.36907 3.22462C9.76184 2.90427 10.3408 2.92686 10.707 3.29298L15.707 8.29298L15.7753 8.36915C16.0957 8.76192 16.0731 9.34092 15.707 9.70704C15.3408 10.0732 14.7618 10.0958 14.3691 9.7754L14.2929 9.70704L10.9999 6.41407V16C10.9999 16.5523 10.5522 17 9.99992 17C9.44764 17 8.99992 16.5523 8.99992 16Z"/>
@@ -637,7 +643,7 @@ export function ChatMain() {
             </div>
             
             {/* Footer disclaimer */}
-            <div className="relative mt-auto flex min-h-8 w-full items-center justify-center p-2 text-center text-xs md:px-15" style={{color: 'var(--token-text-secondary)', backgroundColor: 'transparent'}}>
+            <div className="relative mt-auto flex min-h-8 w-full items-center justify-center p-2 text-center text-xs md:px-15" style={{color: 'var(--token-text-secondary)', backgroundColor: 'transparent'}} role="contentinfo" aria-label="Disclaimer">
               <div>
                 ChatGPT can make mistakes. Check important info.{" "}
                 <a className="cursor-pointer underline" style={{color: 'var(--token-text-primary)', textDecorationColor: 'var(--token-text-primary)'}}>
