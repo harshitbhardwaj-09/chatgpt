@@ -149,9 +149,9 @@ export async function POST(req: Request) {
       apiKey: apiKey,
     })
 
-    const startTime = Date.now()
-    let responseContent = ''
-    let firstTokenTime: number | undefined
+  const startTime = Date.now()
+  let responseContent = ''
+  let firstTokenTime: number | undefined
 
     // Try different Gemini models as fallback
     let modelToUse = "gemini-2.5-flash" // More stable model
@@ -175,16 +175,24 @@ export async function POST(req: Request) {
         
         try {
           if (dbConversationId && !isTemporaryId) {
+            // Prefer the fully buffered streamed content if onFinish text is empty
+            const rawFinalText = (text ?? responseContent)
+            const finalText = (rawFinalText || '').trim()
+
+            if (!finalText) {
+              console.warn('Assistant returned empty content. Skipping message save to avoid validation error.')
+              return
+            }
             // Store assistant response in database
             const { message } = await MessageService.addMessage(
               userId,
               dbConversationId,
               'assistant',
-              text,
+              finalText,
               {
                 windowId,
                 source: 'web',
-                model: 'gemini-1.5-flash',
+                model: modelToUse,
                 finishReason,
                 usage
               }

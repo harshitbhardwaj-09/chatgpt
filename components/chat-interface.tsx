@@ -15,7 +15,7 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ conversationId }: ChatInterfaceProps = {}) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { user, isLoaded } = useUser()
   const router = useRouter()
@@ -108,12 +108,14 @@ export function ChatInterface({ conversationId }: ChatInterfaceProps = {}) {
         </div>
       </div>
 
-      {/* Mobile Sheet for sidebar */}
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="p-0 md:hidden" aria-label="Mobile navigation" showCloseButton={false}>
-          <ChatSidebar onClose={() => setSidebarOpen(false)} isCollapsed={false} onToggle={() => {}} />
-        </SheetContent>
-      </Sheet>
+      {/* Mobile Sheet for sidebar (only mount on mobile to avoid desktop overlay) */}
+      <div className="md:hidden">
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="p-0" aria-label="Mobile navigation" showCloseButton={false}>
+            <ChatSidebar onClose={() => setSidebarOpen(false)} isCollapsed={false} onToggle={() => {}} />
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {/* Main Content */}
       <div className="relative flex h-full max-w-full flex-1 flex-col" role="main" id="main-content" aria-label="Main content">
