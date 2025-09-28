@@ -233,13 +233,7 @@ export const useChatStore = create<ChatStore>()(
           isArchived: false,
           isPinned: false,
           aiModel: "gemini-1.5-flash",
-          isTemporary: true,  // Mark as temporary
-          windowId: state.windowState.windowId,
-          metadata: {
-            source: 'web',
-            sessionId: state.windowState.windowId,
-            windowInfo: `Session started: ${state.windowState.sessionStartTime.toISOString()}`
-          }
+          isTemporary: true // Mark as temporary; no windowId for fresh chats
         }
         set((state) => ({
           chats: [newChat, ...state.chats],
@@ -512,7 +506,7 @@ export const useChatStore = create<ChatStore>()(
             const { conversations } = await response.json()
             
             // Convert database conversations to chat format
-            const chats: Chat[] = []
+            const dbChats: Chat[] = []
             
             for (const conv of conversations) {
               // Get conversation with messages
@@ -520,7 +514,7 @@ export const useChatStore = create<ChatStore>()(
               if (convResponse.ok) {
                 const { conversation, messages } = await convResponse.json()
                 
-                chats.push({
+                dbChats.push({
                   id: conversation._id,
                   title: conversation.title || 'New Conversation',
                   timestamp: new Date(conversation.createdAt),
@@ -546,10 +540,15 @@ export const useChatStore = create<ChatStore>()(
               }
             }
 
-            set((state) => ({ 
-              chats: chats.sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime()),
-              syncState: { ...state.syncState, isSyncing: false }
-            }))
+            // Merge DB chats with any existing temporary chats
+            set((state) => {
+              const tempChats = state.chats.filter(c => c.isTemporary)
+              const merged = [...tempChats, ...dbChats]
+              return {
+                chats: merged.sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime()),
+                syncState: { ...state.syncState, isSyncing: false }
+              }
+            })
           } else {
             throw new Error(`Failed to load conversations: ${response.status}`)
           }
@@ -578,13 +577,8 @@ export const useChatStore = create<ChatStore>()(
 
           const { conversation } = await response.json()
           
-          // Update local chat with database ID
-          set((state) => ({
-            chats: state.chats.map((c) =>
-              c.id === chatId ? { ...c, id: conversation._id } : c
-            ),
-            activeChat: state.activeChat === chatId ? conversation._id : state.activeChat
-          }))
+          // Mark chat as permanent so routing/UI logic can use stable ID
+          get().makeChatPermanent(chatId, conversation._id, chat.title)
         } catch (error) {
           console.error('Failed to sync chat to database:', error)
         }

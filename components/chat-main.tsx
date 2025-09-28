@@ -2,18 +2,16 @@
 
 import type React from "react"
 import { useRef, useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
 import { useChatStore } from "../lib/chat-store"
 import { Button } from "./ui/button"
 import { Textarea } from "./ui/textarea"
 import { ScrollArea } from "./ui/scroll-area"
-import { Send, Square, Paperclip, X } from "lucide-react"
+import { Square, Paperclip, X } from "lucide-react"
 import { ChatMessage } from "./chat-message"
 import { SimpleFileUpload } from "./simple-file-upload"
 import { MemoryIndicator } from "./memory-indicator"
 
 export function ChatMain() {
-  const router = useRouter()
   const { 
     activeChat, 
     chats,
@@ -48,10 +46,7 @@ export function ChatMain() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Load conversations from database on component mount
-  useEffect(() => {
-    loadConversationsFromDB()
-  }, [])
+  // Conversations are loaded by ChatInterface; avoid reloading here to prevent wiping temporary chats
 
   // Auto-resize textarea
   const adjustTextareaHeight = () => {
@@ -107,7 +102,8 @@ export function ChatMain() {
         body: JSON.stringify({ 
           messages,
           conversationId: chatId,
-          windowId: windowState.windowId,
+          // Only pass windowId if this conversation already has one
+          windowId: chats.find(c => c.id === chatId)?.windowId || undefined,
           userMessage: userMessage,
           attachments: attachments
         }),
@@ -335,11 +331,8 @@ export function ChatMain() {
         renameChat(chatId, title)
       }
 
-      // Redirect to conversation URL if this is a new chat
-      if (isNewChat && chatId) {
-        // Use replace to avoid back button issues
-        router.replace(`/c/${chatId}`)
-      }
+      // Do not navigate for a brand-new temporary chat; we'll move to /c/[id]
+      // automatically once the server assigns a permanent ID.
     }
 
     // Clear input and attachments immediately
