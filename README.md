@@ -393,7 +393,7 @@ This project is licensed under the MIT License.
 
 <div align="center">
 
-**Built with ❤️ by [Your Name](https://github.com/yourusername)**
+**Built with ❤️ by [Harshit](https://github.com/yourusername)**
 
 **⭐ Star this repo if you found it helpful!**
 
