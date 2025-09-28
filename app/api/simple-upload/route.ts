@@ -24,21 +24,48 @@ export async function POST(request: NextRequest) {
 
     try {
       // Handle different file types
-      if (file.type === 'application/pdf') {
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         fileType = 'PDF'
         try {
-          // Temporarily disable PDF parsing to avoid library issues
-          // TODO: Fix pdf-parse library ENOENT error
-          throw new Error('PDF parsing temporarily disabled due to library issues')
-        } catch (pdfError) {
-          console.error('PDF parsing error:', pdfError)
-          // Return a helpful message for PDF files
-          extractedText = `PDF file received: "${file.name}" (${Math.round(file.size / 1024)} KB). 
-          
-Note: PDF text extraction is temporarily unavailable due to a library configuration issue. 
-You can still upload the file and reference it in your conversation, but the text content cannot be automatically extracted at this time.
+          // Primary: pdf-parse (fast, simple)
+          const pdfParse = (await import('pdf-parse')).default as (dataBuffer: Buffer) => Promise<any>
+          const result = await pdfParse(buffer)
+          extractedText = (result?.text || '').trim()
 
-Please try uploading the content as a text file (.txt) or Word document (.docx) instead for automatic text extraction.`
+          // If pdf-parse returns too little text, try a fallback
+          if (!extractedText || extractedText.split(/\s+/).length < 5) {
+            throw new Error('Insufficient text from pdf-parse, trying fallback')
+          }
+        } catch (primaryError) {
+          console.warn('pdf-parse failed or insufficient text, trying pdfjs-dist fallback:', primaryError)
+          try {
+            // Fallback: pdfjs-dist text extraction
+            const pdfjs = await import('pdfjs-dist')
+            // @ts-ignore - worker not strictly needed in Node for textContent
+            const { getDocument } = pdfjs as any
+            const loadingTask = getDocument({ data: buffer })
+            const pdf = await loadingTask.promise
+            const maxPages = Math.min(pdf.numPages, 25) // hard cap to avoid heavy PDFs
+            let textContent = ''
+            for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+              const page = await pdf.getPage(pageNum)
+              const content = await page.getTextContent()
+              const pageText = content.items.map((i: any) => (i.str || '')).join(' ')
+              textContent += (pageNum > 1 ? '\n\n' : '') + pageText
+              // Early stop if we already have plenty of text
+              if (textContent.length > 250_000) break
+            }
+            extractedText = textContent.trim()
+
+            if (!extractedText) {
+              throw new Error('No text extracted via pdfjs-dist')
+            }
+          } catch (fallbackError) {
+            console.error('PDF fallback extraction failed:', fallbackError)
+            extractedText = `PDF file received: "${file.name}" (${Math.round(file.size / 1024)} KB).\n\n`
+              + `We couldn't automatically extract text from this PDF. It may be scanned or image-based. `
+              + `Try uploading a text-friendly version (TXT or DOCX) or copy/paste the relevant text.`
+          }
         }
       } else if (
         file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||

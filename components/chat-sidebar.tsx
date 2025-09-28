@@ -198,7 +198,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
 
 
   return (
-    <div className={`h-full bg-token-sidebar-surface-primary border-r border-token-border-light flex flex-col transition-all duration-300 ease-in-out ${
+    <div className={`h-full bg-token-sidebar-surface-primary flex flex-col transition-all duration-300 ease-in-out ${
       isCollapsed ? 'w-16' : 'w-64'
     }`}>
       {/* Header with Logo and Collapse Button */}
@@ -311,8 +311,8 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
         </Button>
       </div>
 
-      {/* Separator */}
-      {!isCollapsed && <div className="mx-3 my-2 border-t border-token-border-light"></div>}
+  {/* Separator (spacing only, border removed) */}
+  {!isCollapsed && <div className="mx-3 my-2"></div>}
 
       {/* Additional Navigation */}
       <div className="px-3 py-2 space-y-1">
@@ -357,7 +357,7 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
 
       {/* Chats Section */}
        {!isCollapsed && (
-         <div className="flex-1 px-3 py-2">
+         <div className="flex-1 min-h-0 px-3 py-2">
            <div className="flex items-center justify-between mb-3 px-2">
              <div className="text-token-text-secondary text-sm font-medium">
                {searchState.isSearching ? (
@@ -407,8 +407,10 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="h-6 w-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
+                        aria-label="Chat actions"
+                        title="Actions"
                       >
                         <MoreHorizontal className="h-3 w-3" />
                       </Button>
@@ -443,8 +445,11 @@ export function ChatSidebar({ onClose, isCollapsed = false, onToggle }: ChatSide
         </div>
       )}
 
+      {/* Subtle separator above footer */}
+      <div className="mx-3 mt-1 h-px bg-token-border-light/50" />
+
       {/* User section */}
-      <div className={`p-3 border-t border-token-border-light ${
+      <div className={`sticky bottom-0 p-3 bg-token-sidebar-surface-primary ${
         isCollapsed ? 'flex flex-col items-center gap-2' : ''
       }`}>
         {isCollapsed ? (

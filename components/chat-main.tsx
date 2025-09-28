@@ -616,7 +616,8 @@ export function ChatMain() {
                               type="button" 
                               size="icon" 
                               onClick={stopStreaming}
-                              className="composer-submit-btn h-9 w-9 bg-red-600 hover:bg-red-700 text-white"
+                              variant="ghost"
+                              className="composer-submit-btn h-9 w-9 text-black dark:text-white"
                               title="Stop generating"
                             >
                               <Square className="h-4 w-4" />

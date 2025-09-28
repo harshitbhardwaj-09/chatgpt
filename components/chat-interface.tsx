@@ -105,13 +105,13 @@ export function ChatInterface({ conversationId }: ChatInterfaceProps = {}) {
 
       {/* Sidebar Rail */}
       <div className={`
-        relative z-21 h-full shrink-0 overflow-hidden border-e transition-all duration-300
+        relative z-21 h-full shrink-0 overflow-hidden transition-all duration-300
         ${sidebarOpen ? (sidebarCollapsed ? 'w-16' : 'w-64') : 'w-0'} 
         ${sidebarOpen ? 'fixed md:relative' : 'md:relative'}
         ${sidebarOpen ? 'inset-y-0 left-0 md:inset-auto' : ''}
         ${sidebarOpen ? 'z-50 md:z-21' : ''}
         max-md:${sidebarOpen ? 'block' : 'hidden'} md:block
-      `} style={{borderColor: 'var(--token-border-light)'}}>
+      `}>
         <ChatSidebar 
           onClose={() => setSidebarOpen(false)} 
           isCollapsed={sidebarCollapsed} 

@@ -47,7 +47,7 @@ export async function POST(
 // PUT /api/conversations/[id]/messages/[messageId] - Edit a message
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string; messageId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const { userId } = await auth()
@@ -56,18 +56,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { content } = await request.json()
+    const { content, messageId } = await request.json()
     
-    if (!content) {
+    if (!content || !messageId) {
       return NextResponse.json(
-        { error: 'Content is required' },
+        { error: 'Content and messageId are required' },
         { status: 400 }
       )
     }
 
     const message = await MessageService.updateMessage(
       userId,
-      params.messageId,
+      messageId,
       content
     )
     

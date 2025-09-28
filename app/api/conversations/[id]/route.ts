@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { ConversationService } from '@/lib/db-utils'
+import { ConversationService, MessageService } from '@/lib/db-utils'
 
 // GET /api/conversations/[id] - Get a specific conversation
 export async function GET(
@@ -15,13 +15,14 @@ export async function GET(
     }
 
     const result = await ConversationService.getConversation(userId, params.id)
-    const conversation = result?.conversation
-    
-    if (!conversation) {
+    if (!result?.conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ conversation })
+  // Also return messages so the client can render history in one call
+  const convId = (result.conversation as any)._id?.toString?.() || params.id
+  const messages = await MessageService.getMessages(convId, { includeSystem: false })
+    return NextResponse.json({ conversation: result.conversation, messages })
   } catch (error) {
     console.error('Error fetching conversation:', error)
     return NextResponse.json(
