@@ -8,6 +8,33 @@ A pixel-perfect ChatGPT clone built with Next.js 14, featuring advanced memory c
 ![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
 
+---
+
+## 🎬 **🔥 WATCH THE DEMO VIDEO 🔥**
+
+### 📹 **Complete Application Walkthrough**
+**[🎥 ChatGPT Clone - Full Demo Video](https://drive.google.com/file/d/1w3KppzNYyhXrufhBC1wOTnBYDElz3A-S/view?usp=sharing)**
+
+*Experience all features in action: UI/UX perfection, memory integration, file uploads, search functionality, real-time streaming, and mobile responsiveness.*
+
+---
+
+## 📋 **Table of Contents**
+
+- [🎬 Demo Video](#-watch-the-demo-video-)
+- [🎯 Submission Checklist](#-submission-checklist---all-requirements-met)
+- [🚀 Live Demo & Video](#-live-demo--video)
+- [📸 Screenshots](#-screenshots)
+- [⚡ Quick Start](#-quick-start)
+- [🛠️ Technology Stack](#️-technology-stack)
+- [📁 Project Structure](#-project-structure)
+- [🔧 Environment Setup](#-environment-setup)
+- [🚀 Deployment](#-deployment)
+- [📚 Documentation](#-documentation)
+- [🤝 Contributing](#-contributing)
+
+---
+
 ## 🎯 **Submission Checklist - ✅ All Requirements Met**
 
 ### ✅ **UI/UX Requirements**
@@ -28,27 +55,49 @@ A pixel-perfect ChatGPT clone built with Next.js 14, featuring advanced memory c
 - **[✓] Deployed on Vercel** — Production-ready deployment with optimized performance
 
 ### ✅ **Bonus Features (Beyond Requirements)**
+- **[✓] Real-time Search** — Advanced search across conversation titles and message content
+- **[✓] URL Routing** — Unique URLs for each conversation like ChatGPT (`/c/{id}`)
+- **[✓] Window-based Storage** — Intelligent conversation prioritization per browser window
+- **[✓] Session Management** — TTL-based session cleanup and tracking
+- **[✓] Memory Indicators** — Visual feedback for AI memory usage and context truncation
+- **[✓] Theme Support** — Dynamic light/dark mode with theme-aware icons
+- **[✓] Accessibility Enhanced** — ARIA labels, keyboard navigation, screen reader support
+- **[✓] Mobile-first Design** — Responsive sidebar, touch-friendly interactions
+- **[✓] Error Recovery** — Robust error handling with user-friendly messages
+- **[✓] Performance Optimized** — Cursor-based pagination, efficient context building
 
-## ✅ Requirements Coverage
+## ✅ **Requirements Coverage**
 
-The following requirements are fully implemented and verified in this project:
+All submission requirements have been fully implemented and verified:
 
-- [✓] Match ChatGPT UI exactly — layout, spacing, fonts, animations, scrolling, modals
-- [✓] Full mobile responsiveness and ARIA-compliant accessibility
-- [✓] Edit Message with seamless regeneration
-- [✓] Vercel AI SDK integration for chat responses
-- [✓] Context window handling (segment/trim historical messages)
-- [✓] Message streaming with graceful UI updates
-- [✓] Memory capability via Mem0.ai
-- [✓] Image uploads (JPEG, PNG, etc.)
-- [✓] File uploads (PDF, DOCX, TXT, CSV, etc.)
-- [✓] Deployed on Vercel (or similar platform)
-## 🚀 **Live Demo**
+- **[✓] Match ChatGPT UI exactly** — Pixel-perfect layout, spacing, fonts, animations, scrolling, modals
+- **[✓] Full mobile responsiveness** — ARIA-compliant accessibility with semantic HTML
+- **[✓] Edit Message functionality** — Seamless message editing with regeneration behavior
+- **[✓] Vercel AI SDK integration** — Advanced streaming chat responses
+- **[✓] Context window handling** — Smart message segmentation and trimming for model limits
+- **[✓] Message streaming** — Real-time streaming with graceful UI updates
+- **[✓] Memory capability** — Integrated with [Mem0.ai](https://mem0.ai/) for conversation memory
+- **[✓] Image uploads** — Support for JPEG, PNG, and other image formats
+- **[✓] File uploads** — Support for PDF, DOCX, TXT, CSV, and multiple file formats
+- **[✓] Production deployment** — Ready for Vercel deployment with optimized performance
+## 🚀 **Live Application**
 
+### 🌐 **Production Deployment**
 Deploy first, then replace with your URL:
 
-• Vercel: https://v0-chat-gpt-ui-clone-swart.vercel.app/
-• Local dev runs at: http://localhost:3000
+• **Vercel**: https://v0-chat-gpt-ui-clone-swart.vercel.app/  
+• **Local Development**: http://localhost:3000
+
+### 🎯 **Key Features Demonstrated in Video**
+- ✅ Pixel-perfect ChatGPT UI replication
+- ✅ Real-time message streaming with typing indicators
+- ✅ Advanced memory integration with Mem0.ai
+- ✅ File upload support (PDF, DOCX, images)
+- ✅ Search functionality across conversations
+- ✅ Mobile-responsive design with accessibility
+- ✅ URL routing with unique conversation IDs
+- ✅ Theme switching (light/dark mode)
+- ✅ Error handling and recovery mechanisms
 
 ## 📸 **Screenshots**
 
