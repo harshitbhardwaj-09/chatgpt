@@ -190,22 +190,36 @@ export function ChatMessage({ message, isLoading = false, isStreaming = false, o
             <div className="group/bubble relative max-w-[80%] md:max-w-[70%] lg:max-w-[60%] ml-auto">
               {isEditing ? (
                 <div className="w-full animate-in fade-in-0 duration-200">
-                  <Textarea
-                    ref={textareaRef}
-                    value={editState.editedContent}
-                    onChange={handleContentChange}
-                    onKeyDown={handleKeyDown}
-                    className="w-full min-h-[60px] resize-none border border-neutral-700 bg-neutral-900 text-neutral-100 focus:ring-1 focus:ring-blue-600"
-                    placeholder="Edit your message..."
-                    aria-label="Edit your message"
-                  />
-                  <div className="flex gap-2 mt-2">
-                    <Button size="sm" onClick={handleEditSave} disabled={!editState.editedContent.trim()} className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" aria-label="Save edit">
-                      <Check className="w-3 h-3 mr-1" /> Save
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleEditCancel} className="h-7 px-3" aria-label="Cancel edit">
-                      <X className="w-3 h-3 mr-1" /> Cancel
-                    </Button>
+                  <div className="rounded-2xl border border-neutral-700 bg-neutral-900 p-3">
+                    <Textarea
+                      ref={textareaRef}
+                      value={editState.editedContent}
+                      onChange={handleContentChange}
+                      onKeyDown={handleKeyDown}
+                      className="w-full min-h-[72px] resize-none border-0 bg-transparent text-neutral-100 focus:ring-0 focus-visible:ring-0 focus:outline-none"
+                      placeholder="Edit your message..."
+                      aria-label="Edit your message"
+                    />
+                    <div className="mt-3 flex items-center justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleEditCancel}
+                        className="h-8 px-3 rounded-full text-neutral-200 hover:bg-neutral-800"
+                        aria-label="Cancel edit"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleEditSave}
+                        disabled={!editState.editedContent.trim()}
+                        className="h-8 px-4 rounded-full bg-white text-black hover:bg-gray-100 disabled:opacity-50"
+                        aria-label="Send edited message"
+                      >
+                        Send
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : (
