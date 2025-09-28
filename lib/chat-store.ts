@@ -240,6 +240,8 @@ export const useChatStore = create<ChatStore>()(
         set((state) => ({
           chats: [newChat, ...state.chats],
           activeChat: newChat.id,
+          // Clear any previous promotion marker so we don't auto-route to an old conversation
+          lastPromotedChatId: null,
         }))
         
         // Don't sync temporary chats to database yet
